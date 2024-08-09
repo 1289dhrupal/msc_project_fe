@@ -48,7 +48,6 @@ const router = createRouter({
                     name: 'panel',
                     component: () => import('@/views/uikit/PanelsDoc.vue')
                 },
-
                 {
                     path: '/uikit/overlay',
                     name: 'overlay',
@@ -116,11 +115,15 @@ const router = createRouter({
             name: 'notfound',
             component: () => import('@/views/pages/NotFound.vue')
         },
-
         {
             path: '/auth/login',
             name: 'login',
             component: () => import('@/views/pages/auth/Login.vue')
+        },
+        {
+            path: '/auth/register',
+            name: 'register',
+            component: () => import('@/views/pages/auth/Register.vue')
         },
         {
             path: '/auth/access',
@@ -133,6 +136,19 @@ const router = createRouter({
             component: () => import('@/views/pages/auth/Error.vue')
         }
     ]
+});
+
+// Global navigation guard to protect routes
+router.beforeEach((to, from, next) => {
+    const publicPages = ['/auth/login', '/auth/register', '/auth/access', '/auth/error', '/landing'];
+    const authRequired = !publicPages.includes(to.path);
+    const apiKey = localStorage.getItem('apiKey');
+
+    if (authRequired && !apiKey) {
+        next('/auth/login'); // Redirect to login page if not authenticated
+    } else {
+        next(); // Allow access
+    }
 });
 
 export default router;
