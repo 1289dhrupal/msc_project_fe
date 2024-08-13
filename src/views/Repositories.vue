@@ -192,7 +192,7 @@ watch(route, (newRoute) => {
                 <Column header="Actions" alignFrozen="right" style="min-width: 150px" :frozen="balanceFrozen">
                     <template #body="{ data }">
                         <div class="flex items-center">
-                            <router-link class="font-medium no-underline ml-2 text-right cursor-pointer text-blue-500" :to="`/commits?repository_id=${data.id}`">
+                            <router-link class="font-medium no-underline ml-2 text-right cursor-pointer text-blue-500" :to="`/repositories/${data.id}/commits`">
                                 <Button v-tooltip="{ value: 'View Commits', hideDelay: 1000 }" icon="pi pi-eye" class="mx-2 p-button-primary mx-2" rounded></Button>
                             </router-link>
 

@@ -14,7 +14,10 @@ const model = ref([
     },
     {
         label: 'Repositories',
-        items: [{ label: 'Repositories', icon: 'pi pi-fw pi-home', to: '/repositories' }]
+        items: [
+            { label: 'Repositories', icon: 'pi pi-fw pi-home', to: '/repositories' },
+            { label: 'Commits', icon: 'pi pi-fw pi-home', to: '/commits' }
+        ]
     },
     {
         label: 'UI Components',

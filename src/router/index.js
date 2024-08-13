@@ -23,6 +23,17 @@ const router = createRouter({
                     name: 'repostiories',
                     component: () => import('@/views/Repositories.vue')
                 },
+                // Commits route
+                {
+                    path: '/repositories/:id/commits',
+                    name: 'repo-commits',
+                    component: () => import('@/views/Commits.vue')
+                },
+                {
+                    path: '/commits',
+                    name: 'commits',
+                    component: () => import('@/views/Commits.vue')
+                },
                 {
                     path: '/uikit/formlayout',
                     name: 'formlayout',
