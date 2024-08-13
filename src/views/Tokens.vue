@@ -196,7 +196,13 @@ onMounted(() => {
             <ToggleButton v-model="balanceFrozen" onIcon="pi pi-lock" offIcon="pi pi-lock-open" onLabel="Action" offLabel="Action" />
 
             <DataTable :value="tokens" scrollable scrollHeight="400px" class="mt-6">
-                <Column field="token" header="Token" style="min-width: 150px" frozen class="font-bold">{{ data.token }}</Column>
+                <Column header="Token" style="min-width: 150px" frozen class="font-bold">
+                    <template #body="{ data }">
+                        <router-link class="underline ml-2 text-right cursor-pointer text-primary font-bold" :to="`/repositories?git_token_id=${data.id}`">
+                            <span v-tooltip="{ value: 'View Repositories', hideDelay: 100 }" class="mr-2">{{ data.token }}</span>
+                        </router-link>
+                    </template>
+                </Column>
                 <Column field="id" header="ID" style="min-width: 150px"></Column>
                 <Column field="service" header="Service" style="min-width: 150px"></Column>
                 <Column field="created_at" header="Created At" style="min-width: 150px"></Column>
@@ -204,9 +210,9 @@ onMounted(() => {
                 <Column header="Actions" alignFrozen="right" style="min-width: 150px" :frozen="balanceFrozen">
                     <template #body="{ data }">
                         <div class="flex items-center">
-                            <router-link class="font-medium no-underline ml-2 text-right cursor-pointer text-blue-500" :to="`/repositories?git_token_id=${data.id}`">
+                            <!-- <router-link class="font-medium no-underline ml-2 text-right cursor-pointer text-blue-500" :to="`/repositories?git_token_id=${data.id}`">
                                 <Button v-tooltip="{ value: 'View Repositories', hideDelay: 1000 }" icon="pi pi-eye" class="mx-2 p-button-primary mx-2" rounded></Button>
-                            </router-link>
+                            </router-link> -->
                             <Button icon="pi pi-trash" class="mx-2 p-button-danger mx-2" rounded @click="openConfirmation(data.id)"></Button>
                             <ToggleSwitch v-tooltip="{ value: 'Disable this Token', hideDelay: 1000 }" :modelValue="!data.is_disabled" class="mx-2" @change="handleToggleChange(data.id, data.is_disabled)" />
                         </div>

@@ -179,8 +179,11 @@ watch(route, (newRoute) => {
                 <Column field="url" header="Repository" style="min-width: 200px" frozen class="font-bold">
                     <template #body="{ data }">
                         <div class="flex items-center">
+                            <router-link class="font-bold underline ml-2 text-right cursor-pointer text-primary" :to="`/repositories/${data.id}/commits`">
+                                <span v-tooltip="{ value: 'View Commits', hideDelay: 100 }" class="mr-2">{{ data.owner }}/{{ data.name }}</span>
+                            </router-link>
+
                             <a :href="data.url" target="_blank" class="text-blue-500 underline">
-                                <span class="mr-2">{{ data.owner }}/{{ data.name }}</span>
                                 <i class="pi pi-external-link" />
                             </a>
                         </div>
@@ -192,10 +195,10 @@ watch(route, (newRoute) => {
                 <Column header="Actions" alignFrozen="right" style="min-width: 150px" :frozen="balanceFrozen">
                     <template #body="{ data }">
                         <div class="flex items-center">
-                            <router-link class="font-medium no-underline ml-2 text-right cursor-pointer text-blue-500" :to="`/repositories/${data.id}/commits`">
+                            <!-- <router-link class="font-medium no-underline ml-2 text-right cursor-pointer text-blue-500" :to="`/repositories/${data.id}/commits`">
                                 <Button v-tooltip="{ value: 'View Commits', hideDelay: 1000 }" icon="pi pi-eye" class="mx-2 p-button-primary mx-2" rounded></Button>
                             </router-link>
-
+ -->
                             <Button icon="pi pi-trash" class="mx-2 p-button-danger" rounded @click="openConfirmation(data.id)" />
                             <ToggleSwitch v-tooltip="{ value: 'Disable this Repository', hideDelay: 1000 }" :modelValue="!data.is_disabled" class="mx-2" @change="handleToggleChange(data.id, data.is_disabled)" />
                         </div>

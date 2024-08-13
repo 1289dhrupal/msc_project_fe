@@ -62,6 +62,7 @@ const computedCommits = computed(() => {
         return {
             ...commit,
             shortSha: commit.sha.slice(-7),
+            repositoryName: repository ? `${repository.owner}/${repository.name}` : '',
             commitUrl: repository ? `${repository.url}/commit/${commit.sha}` : ''
         };
     });
@@ -105,14 +106,16 @@ const goBack = () => {
                     <Column field="sha" header="SHA" style="min-width: 250px">
                         <template #body="{ data }">
                             <div class="flex items-center">
+                                <span class="mr-2">{{ data.shortSha }}</span>
                                 <a :href="data.commitUrl" target="_blank" class="text-blue-500 underline">
-                                    <span class="mr-2">{{ data.shortSha }}</span>
                                     <i class="pi pi-external-link" />
                                 </a>
                             </div>
                         </template>
                     </Column>
                 </template>
+                <Column field="repositoryName" header="Repository" style="min-width: 250px"></Column>
+
                 <Column field="author" header="Author" style="min-width: 150px"></Column>
                 <Column field="message" header="Message" style="min-width: 300px"></Column>
                 <Column field="date" header="Date" style="min-width: 200px"></Column>
