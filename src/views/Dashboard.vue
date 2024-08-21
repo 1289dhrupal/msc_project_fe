@@ -1,343 +1,310 @@
 <script setup>
-import { useLayout } from '@/layout/composables/layout';
-import { ProductService } from '@/service/ProductService';
-import { onMounted, ref, watch } from 'vue';
+import { onMounted, ref } from 'vue';
 
-const { getPrimary, getSurface, isDarkTheme } = useLayout();
+const monthlyCommitData = ref(null);
+const hourlyCommitData = ref(null);
+const topContributorsData = ref(null);
+const userChangesData = ref(null);
 
-const products = ref(null);
-const chartData = ref(null);
-const chartOptions = ref(null);
+const lineOptions = ref(null);
+const barOptions = ref(null);
+const radarOptions = ref(null);
 
-const items = ref([
-    { label: 'Add New', icon: 'pi pi-fw pi-plus' },
-    { label: 'Remove', icon: 'pi pi-fw pi-trash' }
-]);
+const stats = ref({});
+const errorMessage = ref('');
+const successMessage = ref('');
 
-onMounted(() => {
-    ProductService.getProductsSmall().then((data) => (products.value = data));
-    chartData.value = setChartData();
-    chartOptions.value = setChartOptions();
-});
+const apiUrl = import.meta.env.VITE_API_URL;
 
-function setChartData() {
+onMounted(async () => {
     const documentStyle = getComputedStyle(document.documentElement);
+    const textColor = documentStyle.getPropertyValue('--text-color');
+    const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
 
-    return {
-        labels: ['Q1', 'Q2', 'Q3', 'Q4'],
-        datasets: [
-            {
-                type: 'bar',
-                label: 'Subscriptions',
-                backgroundColor: documentStyle.getPropertyValue('--p-primary-400'),
-                data: [4000, 10000, 15000, 4000],
-                barThickness: 32
-            },
-            {
-                type: 'bar',
-                label: 'Advertising',
-                backgroundColor: documentStyle.getPropertyValue('--p-primary-300'),
-                data: [2100, 8400, 2400, 7500],
-                barThickness: 32
-            },
-            {
-                type: 'bar',
-                label: 'Affiliate',
-                backgroundColor: documentStyle.getPropertyValue('--p-primary-200'),
-                data: [4100, 5200, 3400, 7400],
-                borderRadius: {
-                    topLeft: 8,
-                    topRight: 8
-                },
-                borderSkipped: true,
-                barThickness: 32
+    try {
+        // Fetch data from the API
+        const response = await fetch(`${apiUrl}/dashboard/commitFrequency`, {
+            method: 'GET',
+            headers: {
+                Authorization: localStorage.getItem('apiKey'),
+                'Content-Type': 'application/json'
             }
-        ]
-    };
-}
+        });
 
-function setChartOptions() {
-    const documentStyle = getComputedStyle(document.documentElement);
-    const borderColor = documentStyle.getPropertyValue('--surface-border');
-    const textMutedColor = documentStyle.getPropertyValue('--text-color-secondary');
+        if (!response.ok) throw new Error('Failed to fetch commit frequency data');
 
-    return {
-        maintainAspectRatio: false,
-        aspectRatio: 0.8,
+        const data = await response.json();
+
+        if (!data.success) {
+            throw new Error(data.message || 'Failed to retrieve dashboard data.');
+        }
+
+        // Save the statistics for displaying in the table
+        stats.value = {
+            totalCommits: Object.values(data.data.user_stats).reduce((sum, user) => sum + user.count, 0),
+            totalCodeChanges: Object.values(data.data.user_stats).reduce((sum, user) => sum + user.code_changes, 0),
+            totalChanges: Object.values(data.data.user_stats).reduce((sum, user) => sum + user.total_changes, 0),
+            topContributor: Object.keys(data.data.user_stats).reduce((a, b) => (data.data.user_stats[a].count > data.data.user_stats[b].count ? a : b))
+        };
+
+        // Define a list of colors for each year
+        const yearColors = [
+            documentStyle.getPropertyValue('--p-danger-500'),
+            documentStyle.getPropertyValue('--p-primary-500'),
+            documentStyle.getPropertyValue('--p-teal-500'),
+            documentStyle.getPropertyValue('--p-purple-500'),
+            documentStyle.getPropertyValue('--p-orange-500'),
+            documentStyle.getPropertyValue('--p-indigo-500')
+            // Add more colors if needed
+        ];
+
+        // Monthly Commit Data
+        monthlyCommitData.value = {
+            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+            datasets: Object.keys(data.data.monthly_stats).map((year, index) => ({
+                label: year,
+                data: data.data.monthly_stats[year],
+                fill: false,
+                borderColor: yearColors[index % yearColors.length],
+                tension: 0.4
+            }))
+        };
+
+        // Hourly Commit Data
+        hourlyCommitData.value = {
+            labels: Array.from({ length: 24 }, (_, i) => `${i}:00`),
+            datasets: [
+                {
+                    label: 'Commits',
+                    data: data.data.hourly_stats,
+                    backgroundColor: documentStyle.getPropertyValue('--p-primary-500')
+                }
+            ]
+        };
+
+        // Top Contributors Data
+        topContributorsData.value = {
+            labels: Object.keys(data.data.user_stats),
+            datasets: [
+                {
+                    label: 'Commits',
+                    data: Object.values(data.data.user_stats).map((user) => user.count),
+                    backgroundColor: documentStyle.getPropertyValue('--p-primary-500')
+                },
+                {
+                    label: 'Code Changes (in hundreds)',
+                    data: Object.values(data.data.user_stats).map((user) => (user.code_changes / 100).toFixed(0)),
+                    backgroundColor: documentStyle.getPropertyValue('--p-primary-300')
+                }
+            ]
+        };
+
+        userChangesData.value = {
+            labels: Object.keys(data.data.user_stats),
+            datasets: [
+                {
+                    label: 'Code Changes',
+                    data: Object.values(data.data.user_stats).map((user) => ((user.code_changes / user.total_changes) * 100).toFixed(2)),
+                    borderColor: documentStyle.getPropertyValue('--p-primary-300'),
+                    backgroundColor: documentStyle.getPropertyValue('--p-primary-50')
+                }
+            ]
+        };
+
+        successMessage.value = 'Dashboard data retrieved successfully!';
+    } catch (error) {
+        errorMessage.value = error.message;
+    }
+
+    // Common Chart Options
+    lineOptions.value = {
+        plugins: {
+            legend: {
+                labels: {
+                    color: textColor
+                }
+            }
+        },
         scales: {
             x: {
-                stacked: true,
                 ticks: {
-                    color: textMutedColor
+                    color: textColor
                 },
                 grid: {
-                    color: 'transparent',
-                    borderColor: 'transparent'
+                    color: surfaceBorder,
+                    drawBorder: false
                 }
             },
             y: {
-                stacked: true,
                 ticks: {
-                    color: textMutedColor
+                    color: textColor
                 },
                 grid: {
-                    color: borderColor,
-                    borderColor: 'transparent',
-                    drawTicks: false
+                    color: surfaceBorder,
+                    drawBorder: false
                 }
             }
         }
     };
-}
 
-const formatCurrency = (value) => {
-    return value.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
-};
+    barOptions.value = {
+        plugins: {
+            legend: {
+                labels: {
+                    color: textColor
+                }
+            }
+        },
+        scales: {
+            x: {
+                ticks: {
+                    color: textColor
+                },
+                grid: {
+                    display: false,
+                    drawBorder: false
+                }
+            },
+            y: {
+                ticks: {
+                    color: textColor
+                },
+                grid: {
+                    color: surfaceBorder,
+                    drawBorder: false
+                }
+            }
+        }
+    };
 
-watch([getPrimary, getSurface, isDarkTheme], () => {
-    chartData.value = setChartData();
-    chartOptions.value = setChartOptions();
+    radarOptions.value = {
+        plugins: {
+            legend: {
+                labels: {
+                    color: textColor
+                }
+            }
+        },
+        scales: {
+            r: {
+                grid: {
+                    color: textColor
+                },
+                suggestedMin: 50,
+                suggestedMax: 100
+            }
+        }
+    };
 });
 </script>
 
 <template>
+    <div class="p-4">
+        <h1 class="text-2xl font-bold mb-4">Dashboard</h1>
+
+        <div class="flex flex-col gap-4 mb-4" style="min-height: 50px">
+            <Message v-if="successMessage" severity="success">{{ successMessage }}</Message>
+            <Message v-if="errorMessage" severity="error">{{ errorMessage }}</Message>
+        </div>
+
+        <div class="grid grid-cols-12 gap-8">
+            <div class="col-span-12 lg:col-span-6 xl:col-span-3">
+                <div class="card mb-0">
+                    <div class="flex justify-between mb-4">
+                        <div>
+                            <span class="block text-muted-color font-medium mb-4">Total Commits</span>
+                            <div class="text-surface-900 dark:text-surface-0 font-medium text-xl">{{ stats.totalCommits }}</div>
+                        </div>
+                        <div class="flex items-center justify-center bg-blue-100 dark:bg-blue-400/10 rounded-border" style="width: 2.5rem; height: 2.5rem">
+                            <i class="pi pi-github text-blue-500 !text-xl"></i>
+                        </div>
+                    </div>
+                    <!-- <span class="text-primary font-medium">24 new </span>
+                    <span class="text-muted-color">since last visit</span> -->
+                </div>
+            </div>
+            <div class="col-span-12 lg:col-span-6 xl:col-span-3">
+                <div class="card mb-0">
+                    <div class="flex justify-between mb-4">
+                        <div>
+                            <span class="block text-muted-color font-medium mb-4">Total Code Changes</span>
+                            <div class="text-surface-900 dark:text-surface-0 font-medium text-xl">{{ stats.totalCodeChanges }}</div>
+                        </div>
+                        <div class="flex items-center justify-center bg-orange-100 dark:bg-orange-400/10 rounded-border" style="width: 2.5rem; height: 2.5rem">
+                            <i class="pi pi-code text-orange-500 !text-xl"></i>
+                        </div>
+                    </div>
+                    <!-- <span class="text-primary font-medium">%52+ </span>
+                    <span class="text-muted-color">since last week</span> -->
+                </div>
+            </div>
+            <div class="col-span-12 lg:col-span-6 xl:col-span-3">
+                <div class="card mb-0">
+                    <div class="flex justify-between mb-4">
+                        <div>
+                            <span class="block text-muted-color font-medium mb-4">Total Changes</span>
+                            <div class="text-surface-900 dark:text-surface-0 font-medium text-xl">{{ stats.totalChanges }}</div>
+                        </div>
+                        <div class="flex items-center justify-center bg-cyan-100 dark:bg-cyan-400/10 rounded-border" style="width: 2.5rem; height: 2.5rem">
+                            <i class="pi pi-file-edit text-cyan-500 !text-xl"></i>
+                        </div>
+                    </div>
+                    <!-- <span class="text-primary font-medium">520 </span>
+                    <span class="text-muted-color">newly registered</span> -->
+                </div>
+            </div>
+            <div class="col-span-12 lg:col-span-6 xl:col-span-3">
+                <div class="card mb-0">
+                    <div class="flex justify-between mb-4">
+                        <div>
+                            <span class="block text-muted-color font-medium mb-4">Top Contributor</span>
+                            <div class="text-surface-900 dark:text-surface-0 font-medium text-xl">{{ stats.topContributor }}</div>
+                        </div>
+                        <div class="flex items-center justify-center bg-purple-100 dark:bg-purple-400/10 rounded-border" style="width: 2.5rem; height: 2.5rem">
+                            <i class="pi pi-user text-purple-500 !text-xl"></i>
+                        </div>
+                    </div>
+                    <!-- <span class="text-primary font-medium">85 </span>
+                    <span class="text-muted-color">responded</span> -->
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="grid grid-cols-12 gap-8">
-        <div class="col-span-12 lg:col-span-6 xl:col-span-3">
-            <div class="card mb-0">
-                <div class="flex justify-between mb-4">
-                    <div>
-                        <span class="block text-muted-color font-medium mb-4">Orders</span>
-                        <div class="text-surface-900 dark:text-surface-0 font-medium text-xl">152</div>
-                    </div>
-                    <div class="flex items-center justify-center bg-blue-100 dark:bg-blue-400/10 rounded-border" style="width: 2.5rem; height: 2.5rem">
-                        <i class="pi pi-shopping-cart text-blue-500 !text-xl"></i>
-                    </div>
-                </div>
-                <span class="text-primary font-medium">24 new </span>
-                <span class="text-muted-color">since last visit</span>
-            </div>
-        </div>
-        <div class="col-span-12 lg:col-span-6 xl:col-span-3">
-            <div class="card mb-0">
-                <div class="flex justify-between mb-4">
-                    <div>
-                        <span class="block text-muted-color font-medium mb-4">Revenue</span>
-                        <div class="text-surface-900 dark:text-surface-0 font-medium text-xl">$2.100</div>
-                    </div>
-                    <div class="flex items-center justify-center bg-orange-100 dark:bg-orange-400/10 rounded-border" style="width: 2.5rem; height: 2.5rem">
-                        <i class="pi pi-dollar text-orange-500 !text-xl"></i>
-                    </div>
-                </div>
-                <span class="text-primary font-medium">%52+ </span>
-                <span class="text-muted-color">since last week</span>
-            </div>
-        </div>
-        <div class="col-span-12 lg:col-span-6 xl:col-span-3">
-            <div class="card mb-0">
-                <div class="flex justify-between mb-4">
-                    <div>
-                        <span class="block text-muted-color font-medium mb-4">Customers</span>
-                        <div class="text-surface-900 dark:text-surface-0 font-medium text-xl">28441</div>
-                    </div>
-                    <div class="flex items-center justify-center bg-cyan-100 dark:bg-cyan-400/10 rounded-border" style="width: 2.5rem; height: 2.5rem">
-                        <i class="pi pi-users text-cyan-500 !text-xl"></i>
-                    </div>
-                </div>
-                <span class="text-primary font-medium">520 </span>
-                <span class="text-muted-color">newly registered</span>
-            </div>
-        </div>
-        <div class="col-span-12 lg:col-span-6 xl:col-span-3">
-            <div class="card mb-0">
-                <div class="flex justify-between mb-4">
-                    <div>
-                        <span class="block text-muted-color font-medium mb-4">Comments</span>
-                        <div class="text-surface-900 dark:text-surface-0 font-medium text-xl">152 Unread</div>
-                    </div>
-                    <div class="flex items-center justify-center bg-purple-100 dark:bg-purple-400/10 rounded-border" style="width: 2.5rem; height: 2.5rem">
-                        <i class="pi pi-comment text-purple-500 !text-xl"></i>
-                    </div>
-                </div>
-                <span class="text-primary font-medium">85 </span>
-                <span class="text-muted-color">responded</span>
-            </div>
-        </div>
-
+        <!-- Monthly Commit Activity -->
         <div class="col-span-12 xl:col-span-6">
             <div class="card">
-                <div class="font-semibold text-xl mb-4">Recent Sales</div>
-                <DataTable :value="products" :rows="5" :paginator="true" responsiveLayout="scroll">
-                    <Column style="width: 15%" header="Image">
-                        <template #body="slotProps">
-                            <img :src="`https://primefaces.org/cdn/primevue/images/product/${slotProps.data.image}`" :alt="slotProps.data.image" width="50" class="shadow" />
-                        </template>
-                    </Column>
-                    <Column field="name" header="Name" :sortable="true" style="width: 35%"></Column>
-                    <Column field="price" header="Price" :sortable="true" style="width: 35%">
-                        <template #body="slotProps">
-                            {{ formatCurrency(slotProps.data.price) }}
-                        </template>
-                    </Column>
-                    <Column style="width: 15%" header="View">
-                        <template #body>
-                            <Button icon="pi pi-search" type="button" class="p-button-text"></Button>
-                        </template>
-                    </Column>
-                </DataTable>
-            </div>
-            <div class="card">
-                <div class="flex justify-between items-center mb-6">
-                    <div class="font-semibold text-xl">Best Selling Products</div>
-                    <div>
-                        <Button icon="pi pi-ellipsis-v" class="p-button-text p-button-plain p-button-rounded" @click="$refs.menu2.toggle($event)"></Button>
-                        <Menu ref="menu2" :popup="true" :model="items" class="!min-w-40"></Menu>
-                    </div>
-                </div>
-                <ul class="list-none p-0 m-0">
-                    <li class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-                        <div>
-                            <span class="text-surface-900 dark:text-surface-0 font-medium mr-2 mb-1 md:mb-0">Space T-Shirt</span>
-                            <div class="mt-1 text-muted-color">Clothing</div>
-                        </div>
-                        <div class="mt-2 md:mt-0 flex items-center">
-                            <div class="bg-surface-300 dark:bg-surface-500 rounded-border overflow-hidden w-40 lg:w-24" style="height: 8px">
-                                <div class="bg-orange-500 h-full" style="width: 50%"></div>
-                            </div>
-                            <span class="text-orange-500 ml-4 font-medium">%50</span>
-                        </div>
-                    </li>
-                    <li class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-                        <div>
-                            <span class="text-surface-900 dark:text-surface-0 font-medium mr-2 mb-1 md:mb-0">Portal Sticker</span>
-                            <div class="mt-1 text-muted-color">Accessories</div>
-                        </div>
-                        <div class="mt-2 md:mt-0 ml-0 md:ml-20 flex items-center">
-                            <div class="bg-surface-300 dark:bg-surface-500 rounded-border overflow-hidden w-40 lg:w-24" style="height: 8px">
-                                <div class="bg-cyan-500 h-full" style="width: 16%"></div>
-                            </div>
-                            <span class="text-cyan-500 ml-4 font-medium">%16</span>
-                        </div>
-                    </li>
-                    <li class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-                        <div>
-                            <span class="text-surface-900 dark:text-surface-0 font-medium mr-2 mb-1 md:mb-0">Supernova Sticker</span>
-                            <div class="mt-1 text-muted-color">Accessories</div>
-                        </div>
-                        <div class="mt-2 md:mt-0 ml-0 md:ml-20 flex items-center">
-                            <div class="bg-surface-300 dark:bg-surface-500 rounded-border overflow-hidden w-40 lg:w-24" style="height: 8px">
-                                <div class="bg-pink-500 h-full" style="width: 67%"></div>
-                            </div>
-                            <span class="text-pink-500 ml-4 font-medium">%67</span>
-                        </div>
-                    </li>
-                    <li class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-                        <div>
-                            <span class="text-surface-900 dark:text-surface-0 font-medium mr-2 mb-1 md:mb-0">Wonders Notebook</span>
-                            <div class="mt-1 text-muted-color">Office</div>
-                        </div>
-                        <div class="mt-2 md:mt-0 ml-0 md:ml-20 flex items-center">
-                            <div class="bg-surface-300 dark:bg-surface-500 rounded-border overflow-hidden w-40 lg:w-24" style="height: 8px">
-                                <div class="bg-green-500 h-full" style="width: 35%"></div>
-                            </div>
-                            <span class="text-primary ml-4 font-medium">%35</span>
-                        </div>
-                    </li>
-                    <li class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-                        <div>
-                            <span class="text-surface-900 dark:text-surface-0 font-medium mr-2 mb-1 md:mb-0">Mat Black Case</span>
-                            <div class="mt-1 text-muted-color">Accessories</div>
-                        </div>
-                        <div class="mt-2 md:mt-0 ml-0 md:ml-20 flex items-center">
-                            <div class="bg-surface-300 dark:bg-surface-500 rounded-border overflow-hidden w-40 lg:w-24" style="height: 8px">
-                                <div class="bg-purple-500 h-full" style="width: 75%"></div>
-                            </div>
-                            <span class="text-purple-500 ml-4 font-medium">%75</span>
-                        </div>
-                    </li>
-                    <li class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-                        <div>
-                            <span class="text-surface-900 dark:text-surface-0 font-medium mr-2 mb-1 md:mb-0">Robots T-Shirt</span>
-                            <div class="mt-1 text-muted-color">Clothing</div>
-                        </div>
-                        <div class="mt-2 md:mt-0 ml-0 md:ml-20 flex items-center">
-                            <div class="bg-surface-300 dark:bg-surface-500 rounded-border overflow-hidden w-40 lg:w-24" style="height: 8px">
-                                <div class="bg-teal-500 h-full" style="width: 40%"></div>
-                            </div>
-                            <span class="text-teal-500 ml-4 font-medium">%40</span>
-                        </div>
-                    </li>
-                </ul>
+                <div class="font-semibold text-xl mb-4">Monthly Commit Activity</div>
+                <Chart type="line" :data="monthlyCommitData" :options="lineOptions"></Chart>
+                <p class="mt-4 text-sm text-muted">This chart shows the monthly distribution of commits across different years. It helps identify trends in commit frequency over time.</p>
             </div>
         </div>
+
+        <!-- Hourly Commit Distribution -->
         <div class="col-span-12 xl:col-span-6">
             <div class="card">
-                <div class="font-semibold text-xl mb-4">Revenue Stream</div>
-                <Chart type="bar" :data="chartData" :options="chartOptions" class="h-80" />
+                <div class="font-semibold text-xl mb-4">Hourly Commit Distribution</div>
+                <Chart type="bar" :data="hourlyCommitData" :options="barOptions"></Chart>
+                <p class="mt-4 text-sm text-muted">This chart illustrates the distribution of commits made during different hours of the day. It highlights peak activity periods.</p>
             </div>
+        </div>
+
+        <!-- Top Contributors -->
+        <div class="col-span-12 xl:col-span-6">
             <div class="card">
-                <div class="flex items-center justify-between mb-6">
-                    <div class="font-semibold text-xl">Notifications</div>
-                    <div>
-                        <Button icon="pi pi-ellipsis-v" class="p-button-text p-button-plain p-button-rounded" @click="$refs.menu1.toggle($event)"></Button>
-                        <Menu ref="menu1" :popup="true" :model="items" class="!min-w-40"></Menu>
-                    </div>
-                </div>
+                <div class="font-semibold text-xl mb-4">Top Contributors</div>
+                <Chart type="bar" :data="topContributorsData" :options="barOptions"></Chart>
+                <p class="mt-4 text-sm text-muted">This chart ranks contributors based on the number of commits and code changes. It showcases the most active developers.</p>
+            </div>
+        </div>
 
-                <span class="block text-muted-color font-medium mb-4">TODAY</span>
-                <ul class="p-0 mx-0 mt-0 mb-6 list-none">
-                    <li class="flex items-center py-2 border-b border-surface">
-                        <div class="w-12 h-12 flex items-center justify-center bg-blue-100 dark:bg-blue-400/10 rounded-full mr-4 shrink-0">
-                            <i class="pi pi-dollar !text-xl text-blue-500"></i>
-                        </div>
-                        <span class="text-surface-900 dark:text-surface-0 leading-normal"
-                            >Richard Jones
-                            <span class="text-surface-700 dark:text-surface-100">has purchased a blue t-shirt for <span class="text-primary font-bold">$79.00</span></span>
-                        </span>
-                    </li>
-                    <li class="flex items-center py-2">
-                        <div class="w-12 h-12 flex items-center justify-center bg-orange-100 dark:bg-orange-400/10 rounded-full mr-4 shrink-0">
-                            <i class="pi pi-download !text-xl text-orange-500"></i>
-                        </div>
-                        <span class="text-surface-700 dark:text-surface-100 leading-normal">Your request for withdrawal of <span class="text-primary font-bold">$2500.00</span> has been initiated.</span>
-                    </li>
-                </ul>
-
-                <span class="block text-muted-color font-medium mb-4">YESTERDAY</span>
-                <ul class="p-0 m-0 list-none mb-6">
-                    <li class="flex items-center py-2 border-b border-surface">
-                        <div class="w-12 h-12 flex items-center justify-center bg-blue-100 dark:bg-blue-400/10 rounded-full mr-4 shrink-0">
-                            <i class="pi pi-dollar !text-xl text-blue-500"></i>
-                        </div>
-                        <span class="text-surface-900 dark:text-surface-0 leading-normal"
-                            >Keyser Wick
-                            <span class="text-surface-700 dark:text-surface-100">has purchased a black jacket for <span class="text-primary font-bold">$59.00</span></span>
-                        </span>
-                    </li>
-                    <li class="flex items-center py-2 border-b border-surface">
-                        <div class="w-12 h-12 flex items-center justify-center bg-pink-100 dark:bg-pink-400/10 rounded-full mr-4 shrink-0">
-                            <i class="pi pi-question !text-xl text-pink-500"></i>
-                        </div>
-                        <span class="text-surface-900 dark:text-surface-0 leading-normal"
-                            >Jane Davis
-                            <span class="text-surface-700 dark:text-surface-100">has posted a new questions about your product.</span>
-                        </span>
-                    </li>
-                </ul>
-                <span class="block text-muted-color font-medium mb-4">LAST WEEK</span>
-                <ul class="p-0 m-0 list-none">
-                    <li class="flex items-center py-2 border-b border-surface">
-                        <div class="w-12 h-12 flex items-center justify-center bg-green-100 dark:bg-green-400/10 rounded-full mr-4 shrink-0">
-                            <i class="pi pi-arrow-up !text-xl text-green-500"></i>
-                        </div>
-                        <span class="text-surface-900 dark:text-surface-0 leading-normal">Your revenue has increased by <span class="text-primary font-bold">%25</span>.</span>
-                    </li>
-                    <li class="flex items-center py-2 border-b border-surface">
-                        <div class="w-12 h-12 flex items-center justify-center bg-purple-100 dark:bg-purple-400/10 rounded-full mr-4 shrink-0">
-                            <i class="pi pi-heart !text-xl text-purple-500"></i>
-                        </div>
-                        <span class="text-surface-900 dark:text-surface-0 leading-normal"><span class="text-primary font-bold">12</span> users have added your products to their wishlist.</span>
-                    </li>
-                </ul>
+        <!-- Repository Changes -->
+        <div class="col-span-12 xl:col-span-6">
+            <div class="card">
+                <div class="font-semibold text-xl mb-4">Repository Changes</div>
+                <Chart type="radar" :data="userChangesData" :options="radarOptions"></Chart>
+                <p class="mt-4 text-sm text-muted">This radar chart compares the percentage of code changes across different contributors, providing insights into the code quality and contribution balance.</p>
             </div>
         </div>
     </div>
