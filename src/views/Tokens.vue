@@ -1,9 +1,11 @@
 <script setup>
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 
 const tokens = ref([]);
 const newToken = ref('');
+const newUrl = ref('');
 const newService = ref(null);
+const newDescription = ref(''); // New description field
 const errorMessage = ref('');
 const successMessage = ref('');
 const apiUrl = import.meta.env.VITE_API_URL; // Base API URL from environment variable
@@ -22,6 +24,17 @@ const dropdownItems = ref(
     }))
 );
 
+// Watcher to automatically update and lock the URL when GitHub is selected
+watch(newService, (service) => {
+    if (service && service.code === 'github') {
+        newUrl.value = 'https://github.com';
+    } else {
+        newUrl.value = ''; // Reset the URL if any other service is selected
+    }
+});
+
+const descriptionLength = computed(() => newDescription.value.length);
+
 const fetchTokens = async () => {
     try {
         const response = await fetch(`${apiUrl}/git-token/list`, {
@@ -37,6 +50,7 @@ const fetchTokens = async () => {
         const data = await response.json();
         if (data.success) {
             tokens.value = data.data;
+            successMessage.value = 'Tokens retrieved successfully!';
         } else {
             errorMessage.value = 'Failed to retrieve tokens.';
         }
@@ -56,6 +70,15 @@ const addToken = async () => {
         return;
     }
 
+    if (!newUrl.value) {
+        errorMessage.value = 'Please enter a url.';
+        return;
+    }
+    if (newDescription.value.length > 150) {
+        errorMessage.value = 'Description must be 150 characters or less.';
+        return;
+    }
+
     try {
         const response = await fetch(`${apiUrl}/git-token/store`, {
             method: 'POST',
@@ -65,7 +88,9 @@ const addToken = async () => {
             },
             body: JSON.stringify({
                 token: newToken.value,
-                service: newService.value.code
+                url: newUrl.value,
+                service: newService.value.code,
+                description: newDescription.value // Include the description in the API call
             })
         });
 
@@ -75,7 +100,9 @@ const addToken = async () => {
         if (data.success) {
             successMessage.value = data.message || 'Token added successfully!';
             newToken.value = ''; // Clear the input after successful submission
+            newUrl.value = ''; // Clear the input after successful submission
             newService.value = null; // Reset the dropdown after successful submission
+            newDescription.value = ''; // Clear the description after successful submission
             fetchTokens(); // Refresh the tokens list
         } else {
             errorMessage.value = data.message || 'Failed to add token.';
@@ -185,7 +212,16 @@ onMounted(() => {
                 </div>
                 <div class="field w-full">
                     <label for="token" class="sr-only">Token</label>
-                    <InputText id="token" v-model="newToken" type="text" placeholder="Token" class="w-full" />
+                    <InputText id="token" v-model="newToken" type="text" placeholder="Git API Token" class="w-full" />
+                </div>
+                <div class="field w-full">
+                    <label for="url" class="sr-only">Git Service Url</label>
+                    <InputText id="url" v-model="newUrl" type="text" placeholder="https://github.com" class="w-full" :readonly="newService && newService.code === 'github'" :class="{ 'readonly-input': newService && newService.code === 'github' }" />
+                </div>
+                <div class="field w-full">
+                    <label for="description" class="sr-only">Description</label>
+                    <InputText id="description" v-model="newDescription" type="text" placeholder="Description..." class="w-full" maxlength="150" />
+                    <small>{{ descriptionLength }} of 150 characters</small>
                 </div>
                 <Button label="Add Token" :fluid="false" @click="addToken"></Button>
             </div>
@@ -205,6 +241,11 @@ onMounted(() => {
                 </Column>
                 <Column field="id" header="ID" style="min-width: 150px"></Column>
                 <Column field="service" header="Service" style="min-width: 150px"></Column>
+                <Column field="description" header="Description" style="min-width: 150px">
+                    <template #body="{ data }">
+                        <span>{{ data.description || 'No description' }}</span>
+                    </template>
+                </Column>
                 <Column field="created_at" header="Created At" style="min-width: 150px"></Column>
                 <Column field="last_fetched_at" header="Last Fetched" style="min-width: 150px"></Column>
                 <Column header="Actions" alignFrozen="right" style="min-width: 150px" :frozen="balanceFrozen">
@@ -233,3 +274,11 @@ onMounted(() => {
         </Dialog>
     </div>
 </template>
+
+<style scoped>
+.readonly-input {
+    background: var(--p-inputtext-disabled-background);
+    color: var(--p-inputtext-disabled-color);
+    cursor: not-allowed; /* Optionally keep this for cursor change */
+}
+</style>

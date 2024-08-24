@@ -98,7 +98,7 @@ const goBack = () => {
         </div>
 
         <div class="card mt-6">
-            <div class="font-semibold text-xl mb-4">Commits List ({{ computedCommits.length !== 0 ? computedCommits.length : 'No commits found' }})</div>
+            <div class="font-semibold text-xl mb-4">Commits List ({{ computedCommits.length !== 0 ? (route.params.id ? computedCommits.length : 'Recent 20') : 'No commits found' }})</div>
 
             <DataTable :value="computedCommits" scrollable scrollHeight="400px" class="mt-6">
                 <!-- Display the last 7 characters of the SHA with a link to the commit URL -->
