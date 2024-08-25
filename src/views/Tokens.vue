@@ -1,46 +1,37 @@
 <script setup>
+import { FilterMatchMode } from '@primevue/core/api';
+import { useToast } from 'primevue/usetoast';
 import { computed, onMounted, ref, watch } from 'vue';
 
 const tokens = ref([]);
 const newToken = ref('');
 const newUrl = ref('');
 const newService = ref(null);
-const newDescription = ref(''); // New description field
-const errorMessage = ref('');
-const successMessage = ref('');
-const apiUrl = import.meta.env.VITE_API_URL; // Base API URL from environment variable
-
-const displayConfirmation = ref(false); // State to control the visibility of the confirmation dialog
-const selectedTokenId = ref(null); // Store the ID of the token to be deleted
-
-// State for the balance frozen column
-const balanceFrozen = ref(false);
-
-// Get service options from the environment variable and map them to objects with 'name' and 'code'
+const newDescription = ref('');
+const apiUrl = import.meta.env.VITE_API_URL;
+const displayConfirmation = ref(false);
+const selectedTokenId = ref(null);
 const dropdownItems = ref(
     import.meta.env.VITE_SERVICE_OPTIONS.split(',').map((service) => ({
         name: service,
         code: service
     }))
 );
-
-// Watcher to automatically update and lock the URL when GitHub is selected
-watch(newService, (service) => {
-    if (service && service.code === 'github') {
-        newUrl.value = 'https://github.com';
-    } else {
-        newUrl.value = ''; // Reset the URL if any other service is selected
-    }
-});
-
 const descriptionLength = computed(() => newDescription.value.length);
+const toast = useToast();
+const tokenDialog = ref(false);
+const submitted = ref(false);
+const filters = ref({
+    global: { value: null, matchMode: FilterMatchMode.CONTAINS }
+});
+const dt = ref(null); // Reference for the DataTable
 
 const fetchTokens = async () => {
     try {
         const response = await fetch(`${apiUrl}/git-token/list`, {
             method: 'GET',
             headers: {
-                Authorization: localStorage.getItem('apiKey'), // Removed 'Bearer ' prefix
+                Authorization: localStorage.getItem('apiKey'),
                 'Content-Type': 'application/json'
             }
         });
@@ -50,32 +41,18 @@ const fetchTokens = async () => {
         const data = await response.json();
         if (data.success) {
             tokens.value = data.data;
-            successMessage.value = 'Tokens retrieved successfully!';
         } else {
-            errorMessage.value = 'Failed to retrieve tokens.';
+            toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to retrieve tokens.', life: 3000 });
         }
     } catch (error) {
-        errorMessage.value = error.message;
+        toast.add({ severity: 'error', summary: 'Error', detail: error.message, life: 3000 });
     }
 };
 
 const addToken = async () => {
-    if (!newService.value) {
-        errorMessage.value = 'Please select a service.';
-        return;
-    }
+    submitted.value = true;
 
-    if (!newToken.value) {
-        errorMessage.value = 'Please enter a token.';
-        return;
-    }
-
-    if (!newUrl.value) {
-        errorMessage.value = 'Please enter a url.';
-        return;
-    }
-    if (newDescription.value.length > 150) {
-        errorMessage.value = 'Description must be 150 characters or less.';
+    if (!newService.value || !newToken.value || !newUrl.value || newDescription.value.length > 150) {
         return;
     }
 
@@ -83,14 +60,14 @@ const addToken = async () => {
         const response = await fetch(`${apiUrl}/git-token/store`, {
             method: 'POST',
             headers: {
-                Authorization: localStorage.getItem('apiKey'), // Removed 'Bearer ' prefix
+                Authorization: localStorage.getItem('apiKey'),
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
                 token: newToken.value,
                 url: newUrl.value,
                 service: newService.value.code,
-                description: newDescription.value // Include the description in the API call
+                description: newDescription.value
             })
         });
 
@@ -98,17 +75,15 @@ const addToken = async () => {
 
         const data = await response.json();
         if (data.success) {
-            successMessage.value = data.message || 'Token added successfully!';
-            newToken.value = ''; // Clear the input after successful submission
-            newUrl.value = ''; // Clear the input after successful submission
-            newService.value = null; // Reset the dropdown after successful submission
-            newDescription.value = ''; // Clear the description after successful submission
-            fetchTokens(); // Refresh the tokens list
+            toast.add({ severity: 'success', summary: 'Successful', detail: 'Token added successfully!', life: 3000 });
+            resetForm();
+            fetchTokens();
+            tokenDialog.value = false;
         } else {
-            errorMessage.value = data.message || 'Failed to add token.';
+            toast.add({ severity: 'error', summary: 'Error', detail: data.message || 'Failed to add token.', life: 3000 });
         }
     } catch (error) {
-        errorMessage.value = error.message;
+        toast.add({ severity: 'error', summary: 'Error', detail: error.message, life: 3000 });
     }
 };
 
@@ -117,7 +92,7 @@ const deleteToken = async (id) => {
         const response = await fetch(`${apiUrl}/git-token/${id}`, {
             method: 'DELETE',
             headers: {
-                Authorization: localStorage.getItem('apiKey'), // Removed 'Bearer ' prefix
+                Authorization: localStorage.getItem('apiKey'),
                 'Content-Type': 'application/json'
             }
         });
@@ -126,17 +101,16 @@ const deleteToken = async (id) => {
 
         const data = await response.json();
         if (data.success) {
-            successMessage.value = data.message || 'Token deleted successfully!';
-            fetchTokens(); // Refresh the tokens list
+            toast.add({ severity: 'success', summary: 'Successful', detail: 'Token deleted successfully!', life: 3000 });
+            fetchTokens();
         } else {
-            errorMessage.value = data.message || 'Failed to delete token.';
+            toast.add({ severity: 'error', summary: 'Error', detail: data.message || 'Failed to delete token.', life: 3000 });
         }
     } catch (error) {
-        errorMessage.value = error.message;
+        toast.add({ severity: 'error', summary: 'Error', detail: error.message, life: 3000 });
     }
 };
 
-// Handle toggle change
 const handleToggleChange = (id, currentStatus) => {
     const newStatus = !currentStatus;
     toggleTokenStatus(id, newStatus);
@@ -151,7 +125,7 @@ const toggleTokenStatus = async (id, newStatus) => {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                is_disabled: newStatus
+                is_active: !newStatus
             })
         });
 
@@ -159,29 +133,26 @@ const toggleTokenStatus = async (id, newStatus) => {
 
         const data = await response.json();
         if (data.success) {
-            successMessage.value = data.message || 'Token status updated successfully!';
-            fetchTokens(); // Refresh the tokens list
+            toast.add({ severity: 'success', summary: 'Successful', detail: 'Token status updated successfully!', life: 3000 });
+            fetchTokens();
         } else {
-            errorMessage.value = data.message || 'Failed to update token status.';
+            toast.add({ severity: 'error', summary: 'Error', detail: data.message || 'Failed to update token status.', life: 3000 });
         }
     } catch (error) {
-        errorMessage.value = error.message;
+        toast.add({ severity: 'error', summary: 'Error', detail: error.message, life: 3000 });
     }
 };
 
-// Open confirmation dialog
 const openConfirmation = (id) => {
     selectedTokenId.value = id;
     displayConfirmation.value = true;
 };
 
-// Close confirmation dialog
 const closeConfirmation = () => {
     displayConfirmation.value = false;
     selectedTokenId.value = null;
 };
 
-// Confirm deletion
 const confirmDeletion = () => {
     if (selectedTokenId.value !== null) {
         deleteToken(selectedTokenId.value);
@@ -189,87 +160,172 @@ const confirmDeletion = () => {
     closeConfirmation();
 };
 
+const openNewTokenDialog = () => {
+    resetForm();
+    tokenDialog.value = true;
+};
+
+const hideDialog = () => {
+    tokenDialog.value = false;
+    submitted.value = false;
+};
+
+const resetForm = () => {
+    newToken.value = '';
+    newUrl.value = '';
+    newService.value = null;
+    newDescription.value = '';
+    submitted.value = false;
+};
+
+const customExportFunction = (cell) => {
+    switch (cell.field) {
+        case 'is_active':
+            return cell.data ? 'Active' : 'Inactive';
+        default:
+            return cell.data;
+    }
+};
+const exportCSV = () => {
+    dt.value.exportCSV();
+};
+
 onMounted(() => {
     fetchTokens();
+});
+
+watch(newService, (service) => {
+    if (service && service.code === 'github') {
+        newUrl.value = 'https://github.com';
+    } else {
+        newUrl.value = '';
+    }
 });
 </script>
 
 <template>
-    <div class="p-4">
+    <div class="pt-4">
         <h1 class="text-2xl font-bold mb-4">Manage Tokens</h1>
 
-        <div class="flex flex-col gap-4 mb-4" style="min-height: 50px">
-            <Message v-if="successMessage" severity="success">{{ successMessage }}</Message>
-            <Message v-if="errorMessage" severity="error">{{ errorMessage }}</Message>
-        </div>
+        <div class="card">
+            <Toolbar class="mb-6">
+                <template #start>
+                    <Button label="New" icon="pi pi-plus" severity="secondary" class="mr-2" @click="openNewTokenDialog" />
+                </template>
+                <template #end>
+                    <Button label="Export" icon="pi pi-upload" severity="secondary" @click="exportCSV" />
+                </template>
+            </Toolbar>
 
-        <div class="card flex flex-col gap-4">
-            <div class="font-semibold text-xl">Add New Token</div>
-            <div class="flex flex-wrap items-start gap-4">
-                <div class="field w-full">
-                    <label for="service" class="sr-only">Service</label>
-                    <Select id="service" v-model="newService" :options="dropdownItems" optionLabel="name" placeholder="Select One" class="w-full" />
-                </div>
-                <div class="field w-full">
-                    <label for="token" class="sr-only">Token</label>
-                    <InputText id="token" v-model="newToken" type="text" placeholder="Git API Token" class="w-full" />
-                </div>
-                <div class="field w-full">
-                    <label for="url" class="sr-only">Git Service Url</label>
-                    <InputText id="url" v-model="newUrl" type="text" placeholder="https://github.com" class="w-full" :readonly="newService && newService.code === 'github'" :class="{ 'readonly-input': newService && newService.code === 'github' }" />
-                </div>
-                <div class="field w-full">
-                    <label for="description" class="sr-only">Description</label>
-                    <InputText id="description" v-model="newDescription" type="text" placeholder="Description..." class="w-full" maxlength="150" />
-                    <small>{{ descriptionLength }} of 150 characters</small>
-                </div>
-                <Button label="Add Token" :fluid="false" @click="addToken"></Button>
-            </div>
-        </div>
+            <DataTable
+                ref="dt"
+                v-model:selection="selectedTokenId"
+                :value="tokens"
+                dataKey="id"
+                :exportFilename="`tokens_${new Date().getTime()}`"
+                :exportFunction="customExportFunction"
+                :paginator="true"
+                :rows="10"
+                :filters="filters"
+                scrollable
+                paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
+                :rowsPerPageOptions="[5, 10, 25]"
+                currentPageReportTemplate="Showing {first} to {last} of {totalRecords} tokens"
+            >
+                <template #header>
+                    <div class="flex flex-wrap gap-2 items-center justify-between">
+                        <div class="font-semibold text-xl mb-4">Tokens List ({{ tokens.length !== 0 ? tokens.length : 'No tokens found' }})</div>
+                        <InputText v-model="filters['global'].value" placeholder="Search..." />
+                    </div>
+                </template>
 
-        <div class="card mt-6">
-            <div class="font-semibold text-xl mb-4">Tokens List</div>
-            <ToggleButton v-model="balanceFrozen" onIcon="pi pi-lock" offIcon="pi pi-lock-open" onLabel="Action" offLabel="Action" />
-
-            <DataTable :value="tokens" scrollable scrollHeight="400px" class="mt-6">
-                <Column header="Token" style="min-width: 150px" frozen class="font-bold">
-                    <template #body="{ data }">
-                        <router-link class="underline ml-2 text-right cursor-pointer text-primary font-bold" :to="`/repositories?git_token_id=${data.id}`">
-                            <span v-tooltip="{ value: 'View Repositories', hideDelay: 100 }" class="mr-2">{{ data.token }}</span>
-                        </router-link>
+                <Column field="id" header="ID" sortable frozen style="min-width: 150px"></Column>
+                <Column field="token" header="Token" sortable class="font-bold underline text-primary" style="min-width: 150px">
+                    <template #body="slotProps">
+                        <router-link :to="`/repositories?git_token_id=${slotProps.data.id}`" class="underline text-primary" v-tooltip="{ value: 'View Repositories', hideDelay: 100 }">{{ slotProps.data.token }}</router-link>
                     </template>
                 </Column>
-                <Column field="id" header="ID" style="min-width: 150px"></Column>
-                <Column field="service" header="Service" style="min-width: 150px"></Column>
-                <Column field="description" header="Description" style="min-width: 150px">
-                    <template #body="{ data }">
-                        <span>{{ data.description || 'No description' }}</span>
-                    </template>
-                </Column>
-                <Column field="created_at" header="Created At" style="min-width: 150px"></Column>
-                <Column field="last_fetched_at" header="Last Fetched" style="min-width: 150px"></Column>
-                <Column header="Actions" alignFrozen="right" style="min-width: 150px" :frozen="balanceFrozen">
-                    <template #body="{ data }">
+                <Column field="service" header="Service" sortable style="min-width: 150px">
+                    <template #body="slotProps">
                         <div class="flex items-center">
-                            <!-- <router-link class="font-medium no-underline ml-2 text-right cursor-pointer text-blue-500" :to="`/repositories?git_token_id=${data.id}`">
-                                <Button v-tooltip="{ value: 'View Repositories', hideDelay: 1000 }" icon="pi pi-eye" class="mx-2 p-button-primary mx-2" rounded></Button>
-                            </router-link> -->
-                            <Button icon="pi pi-trash" class="mx-2 p-button-danger mx-2" rounded @click="openConfirmation(data.id)"></Button>
-                            <ToggleSwitch v-tooltip="{ value: 'Disable this Token', hideDelay: 1000 }" :modelValue="!data.is_disabled" class="mx-2" @change="handleToggleChange(data.id, data.is_disabled)" />
+                            <span class="mr-1 font-bold" style="text-transform: capitalize">{{ slotProps.data.service }}</span>
+                            <a :href="slotProps.data.url" target="_blank" class="ml-1 text-blue-500 underline">
+                                <i class="pi pi-external-link" />
+                            </a>
+                        </div>
+                    </template>
+                </Column>
+                <Column field="url" header="URL" :hidden="true"></Column>
+                <Column field="description" header="Description" sortable style="min-width: 150px">
+                    <template #body="slotProps">
+                        <span>{{ slotProps.data.description ? slotProps.data.description : 'No Description' }}</span>
+                    </template>
+                </Column>
+                <Column field="created_at" header="Created At" sortable style="min-width: 150px"></Column>
+                <Column field="last_fetched_at" header="Last Fetched" sortable style="min-width: 150px"></Column>
+                <Column field="is_active" header="Status" sortable style="min-width: 100px">
+                    <template #body="slotProps">
+                        <Tag class="uppercase" :value="slotProps.data.is_active ? 'Active' : 'Inactive'" :severity="slotProps.data.is_active ? 'success' : 'danger'" />
+                    </template>
+                </Column>
+                <Column header="Actions" :exportable="false" alignFrozen="right" frozen style="min-width: 150px">
+                    <template #body="slotProps">
+                        <div class="flex items-center">
+                            <Button icon="pi pi-trash" class="mr-1" outlined rounded severity="danger" @click="openConfirmation(slotProps.data.id)" />
+                            <ToggleSwitch
+                                v-model="slotProps.data.is_active"
+                                v-tooltip="{ value: slotProps.data.is_active ? 'Deactivate this Token' : 'Activate this Token', hideDelay: 1000 }"
+                                class="ml-1"
+                                @change="handleToggleChange(slotProps.data.id, slotProps.data.is_active)"
+                            />
                         </div>
                     </template>
                 </Column>
             </DataTable>
         </div>
 
-        <Dialog header="Confirmation" v-model:visible="displayConfirmation" :style="{ width: '350px' }" :modal="true">
-            <div class="flex items-center justify-center">
-                <i class="pi pi-exclamation-triangle mr-4" style="font-size: 2rem" />
-                <span>Are you sure you want to proceed?</span>
+        <Dialog v-model:visible="tokenDialog" :style="{ width: '450px' }" header="Token Details" :modal="true">
+            <div class="flex flex-col gap-6">
+                <div>
+                    <label for="service" class="block font-bold mb-3">Service</label>
+                    <Select id="service" v-model="newService" :options="dropdownItems" optionLabel="name" placeholder="Select a Service" fluid />
+                    <small v-if="submitted && !newService.value" class="text-red-500">Service is required.</small>
+                </div>
+
+                <div>
+                    <label for="token" class="block font-bold mb-3">Token</label>
+                    <InputText id="token" v-model="newToken" required="true" :invalid="submitted && !newToken.value" fluid />
+                    <small v-if="submitted && !newToken.value" class="text-red-500">Token is required.</small>
+                </div>
+
+                <div>
+                    <label for="url" class="block font-bold mb-3">URL</label>
+                    <InputText id="url" v-model="newUrl" required="true" :invalid="submitted && !newUrl.value" :readonly="newService && newService.code === 'github'" :class="{ 'readonly-input': newService && newService.code === 'github' }" fluid />
+                    <small v-if="submitted && !newUrl.value" class="text-red-500">URL is required.</small>
+                </div>
+
+                <div>
+                    <label for="description" class="block font-bold mb-3">Description</label>
+                    <Textarea id="description" v-model="newDescription" rows="3" cols="20" fluid />
+                    <small>{{ descriptionLength }} of 150 characters</small>
+                    <small v-if="submitted && newDescription.value.length > 150" class="text-red-500">Description must be 150 characters or less.</small>
+                </div>
+            </div>
+
+            <template #footer>
+                <Button label="Cancel" icon="pi pi-times" severity="danger" outlined text @click="hideDialog" />
+                <Button label="Save" icon="pi pi-check" @click="addToken" />
+            </template>
+        </Dialog>
+
+        <Dialog v-model:visible="displayConfirmation" :style="{ width: '450px' }" header="Confirm" :modal="true">
+            <div class="flex items-center gap-4">
+                <i class="pi pi-exclamation-triangle !text-3xl" />
+                <span>Are you sure you want to delete this token?</span>
             </div>
             <template #footer>
-                <Button label="No" icon="pi pi-times" @click="closeConfirmation" text severity="secondary" />
-                <Button label="Yes" icon="pi pi-check" @click="confirmDeletion" severity="danger" outlined autofocus />
+                <Button label="No" icon="pi pi-times" severity="info" @click="closeConfirmation" />
+                <Button label="Delete" icon="pi pi-check" severity="danger" @click="confirmDeletion" />
             </template>
         </Dialog>
     </div>
@@ -279,6 +335,6 @@ onMounted(() => {
 .readonly-input {
     background: var(--p-inputtext-disabled-background);
     color: var(--p-inputtext-disabled-color);
-    cursor: not-allowed; /* Optionally keep this for cursor change */
+    cursor: not-allowed;
 }
 </style>

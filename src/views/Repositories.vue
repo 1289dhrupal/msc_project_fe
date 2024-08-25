@@ -1,22 +1,25 @@
 <script setup>
+import { FilterMatchMode } from '@primevue/core/api';
+import { useToast } from 'primevue/usetoast';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 const repositories = ref([]);
 const gitTokens = ref([]);
-const selectedToken = ref(null);
+const selectedTokenId = ref([]);
 const searchQuery = ref('');
-const errorMessage = ref('');
-const successMessage = ref('');
 const apiUrl = import.meta.env.VITE_API_URL;
 
 const displayConfirmation = ref(false);
 const selectedRepositoryId = ref(null);
-
-const balanceFrozen = ref(false);
+const filters = ref({
+    global: { value: null, matchMode: FilterMatchMode.CONTAINS }
+});
 
 const router = useRouter();
 const route = useRoute();
+const toast = useToast();
+const dt = ref(null); // Reference for the DataTable
 
 const fetchRepositories = async (tokenId = null) => {
     try {
@@ -37,10 +40,10 @@ const fetchRepositories = async (tokenId = null) => {
             repositories.value = data.data.repositories;
             gitTokens.value = data.data.git_tokens;
         } else {
-            errorMessage.value = 'Failed to retrieve repositories.';
+            toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to retrieve repositories.', life: 3000 });
         }
     } catch (error) {
-        errorMessage.value = error.message;
+        toast.add({ severity: 'error', summary: 'Error', detail: error.message, life: 3000 });
     }
 };
 
@@ -48,19 +51,22 @@ const filteredRepositories = computed(() => {
     if (!searchQuery.value) return repositories.value;
 
     const lowerCaseQuery = searchQuery.value.toLowerCase();
-    return repositories.value.filter((repo) => repo.name.toLowerCase().includes(lowerCaseQuery) || repo.owner.toLowerCase().includes(lowerCaseQuery));
+    return repositories.value.filter(
+        (repo) =>
+            repo.name.toLowerCase().includes(lowerCaseQuery) ||
+            repo.owner.toLowerCase().includes(lowerCaseQuery) ||
+            repo.url.toLowerCase().includes(lowerCaseQuery) ||
+            repo.created_at.toLowerCase().includes(lowerCaseQuery) ||
+            repo.last_fetched_at.toLowerCase().includes(lowerCaseQuery)
+    );
 });
 
 const onTokenSelect = () => {
-    if (selectedToken.value) {
-        router.push(`/repositories?git_token_id=${selectedToken.value.id}`);
+    if (selectedTokenId.value) {
+        router.push(`/repositories?git_token_id=${selectedTokenId.value.id}`);
     }
-    fetchRepositories(selectedToken.value.id);
+    fetchRepositories(selectedTokenId.value.id);
 };
-
-// const goBackToAllRepositories = () => {
-//     router.push('/repositories');
-// };
 
 const deleteRepository = async (id) => {
     try {
@@ -76,13 +82,13 @@ const deleteRepository = async (id) => {
 
         const data = await response.json();
         if (data.success) {
-            successMessage.value = data.message || 'Repository deleted successfully!';
+            toast.add({ severity: 'success', summary: 'Successful', detail: 'Repository deleted successfully!', life: 3000 });
             fetchRepositories(route.query.git_token_id);
         } else {
-            errorMessage.value = data.message || 'Failed to delete repository.';
+            toast.add({ severity: 'error', summary: 'Error', detail: data.message || 'Failed to delete repository.', life: 3000 });
         }
     } catch (error) {
-        errorMessage.value = error.message;
+        toast.add({ severity: 'error', summary: 'Error', detail: error.message, life: 3000 });
     }
 };
 
@@ -100,7 +106,7 @@ const toggleRepositoryStatus = async (id, newStatus) => {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                is_disabled: newStatus
+                is_active: !newStatus
             })
         });
 
@@ -108,13 +114,13 @@ const toggleRepositoryStatus = async (id, newStatus) => {
 
         const data = await response.json();
         if (data.success) {
-            successMessage.value = data.message || 'Repository status updated successfully!';
+            toast.add({ severity: 'success', summary: 'Successful', detail: 'Repository status updated successfully!', life: 3000 });
             fetchRepositories(route.query.git_token_id);
         } else {
-            errorMessage.value = data.message || 'Failed to update repository status.';
+            toast.add({ severity: 'error', summary: 'Error', detail: data.message || 'Failed to update repository status.', life: 3000 });
         }
     } catch (error) {
-        errorMessage.value = error.message;
+        toast.add({ severity: 'error', summary: 'Error', detail: error.message, life: 3000 });
     }
 };
 
@@ -135,6 +141,19 @@ const confirmDeletion = () => {
     closeConfirmation();
 };
 
+const customExportFunction = (cell) => {
+    switch (cell.field) {
+        case 'is_active':
+            return cell.data ? 'Active' : 'Inactive';
+        default:
+            return cell.data;
+    }
+};
+
+const exportCSV = () => {
+    dt.value.exportCSV();
+};
+
 onMounted(() => {
     fetchRepositories(route.query.git_token_id);
 });
@@ -145,76 +164,99 @@ watch(route, (newRoute) => {
     }
 });
 </script>
-<template>
-    <div class="p-4">
-        <h1 class="text-2xl font-bold mb-4">Manage Repositories</h1>
 
-        <!-- Dropdown to select token (only shown when not filtering by token) -->
-        <div v-if="!route.query.git_token_id" class="mb-4">
-            <Select v-model="selectedToken" :options="gitTokens" optionLabel="token" placeholder="Select a Token to filter repositories" class="w-full" @change="onTokenSelect" />
-        </div>
+<template>
+    <div class="pt-4">
+        <h1 class="text-2xl font-bold mb-4">Manage Repositories</h1>
 
         <div v-if="route.query.git_token_id" class="mb-4">
             <Button label="Go Back" icon="pi pi-arrow-left" class="p-button-secondary" @click="$router.go(-1)" />
         </div>
 
-        <div class="flex flex-col gap-4 mb-4" style="min-height: 50px">
-            <Message v-if="successMessage" severity="success">{{ successMessage }}</Message>
-            <Message v-if="errorMessage" severity="error">{{ errorMessage }}</Message>
-        </div>
+        <div class="card">
+            <Toolbar class="mb-6">
+                <template #start v-if="!route.query.git_token_id">
+                    <!-- Dropdown to select token (only shown when not filtering by token) -->
+                    <Select v-model="selectedTokenId" :options="gitTokens" optionLabel="token" placeholder="Select a Token to filter repositories" class="w-full" @change="onTokenSelect" />
+                </template>
+                <template #end>
+                    <Button label="Export" icon="pi pi-upload" severity="secondary" @click="exportCSV" />
+                </template>
+            </Toolbar>
 
-        <div class="card mt-6">
-            <div class="font-semibold text-xl mb-4">Repositories List ({{ filteredRepositories.length !== 0 ? filteredRepositories.length : 'No repositories found' }})</div>
-            <div class="flex justify-between items-center mb-4">
-                <div>
-                    <ToggleButton v-model="balanceFrozen" onIcon="pi pi-lock" offIcon="pi pi-lock-open" onLabel="Action" offLabel="Action" />
-                </div>
-                <div class="w-full max-w-xs">
-                    <InputText v-model="searchQuery" placeholder="Search by name or owner" class="w-full" />
-                </div>
-            </div>
+            <DataTable
+                ref="dt"
+                :value="filteredRepositories"
+                dataKey="id"
+                :exportFilename="`repositories_${new Date().getTime()}`"
+                :exportFunction="customExportFunction"
+                :paginator="true"
+                :rows="10"
+                :filters="filters"
+                scrollable
+                paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
+                :rowsPerPageOptions="[5, 10, 25]"
+                currentPageReportTemplate="Showing {first} to {last} of {totalRecords} repositories"
+            >
+                <template #header>
+                    <div class="flex flex-wrap gap-2 items-center justify-between">
+                        <div class="font-semibold text-xl mb-4">Repository List ({{ filteredRepositories.length !== 0 ? filteredRepositories.length : 'No repositories found' }})</div>
+                        <InputText v-model="filters['global'].value" placeholder="Search..." />
+                    </div>
+                </template>
 
-            <DataTable :value="filteredRepositories" scrollable scrollHeight="400px" class="mt-6">
-                <Column field="id" header="ID" style="min-width: 150px"></Column>
-                <Column field="url" header="Repository" style="min-width: 200px" frozen class="font-bold">
-                    <template #body="{ data }">
+                <Column field="id" header="ID" sortable frozen style="min-width: 150px"></Column>
+                <Column field="url" header="Repository" sortable style="min-width: 200px">
+                    <template #body="slotProps">
                         <div class="flex items-center">
-                            <router-link class="font-bold underline ml-2 text-right cursor-pointer text-primary" :to="`/repositories/${data.id}/commits`">
-                                <span v-tooltip="{ value: 'View Commits', hideDelay: 100 }" class="mr-2">{{ data.owner }}/{{ data.name }}</span>
+                            <router-link class="font-bold underline text-right text-primary mr-1" :to="`/repositories/${slotProps.data.id}/commits`">
+                                <span v-tooltip="{ value: 'View Commits', hideDelay: 100 }" class="ml-1">{{ slotProps.data.owner }}/{{ slotProps.data.name }}</span>
                             </router-link>
 
-                            <a :href="data.url" target="_blank" class="text-blue-500 underline">
+                            <a :href="slotProps.data.url" target="_blank" class="text-blue-500 underline">
                                 <i class="pi pi-external-link" />
                             </a>
                         </div>
                     </template>
                 </Column>
-                <Column field="owner" header="Owner" style="min-width: 150px"></Column>
-                <Column field="created_at" header="Created At" style="min-width: 150px"></Column>
-                <Column field="last_fetched_at" header="Last Fetched" style="min-width: 150px"></Column>
-                <Column header="Actions" alignFrozen="right" style="min-width: 150px" :frozen="balanceFrozen">
-                    <template #body="{ data }">
+                <Column field="name" header="Repository Name" sortable style="min-width: 150px"></Column>
+                <Column field="owner" header="Owner" sortable style="min-width: 150px"></Column>
+                <Column field="description" header="Description" sortable style="min-width: 150px">
+                    <template #body="slotProps">
+                        <span>{{ slotProps.data.description ? slotProps.data.description : 'No Description' }}</span>
+                    </template>
+                </Column>
+                <Column field="created_at" header="Created At" sortable style="min-width: 150px"></Column>
+                <Column field="last_fetched_at" header="Last Fetched" sortable style="min-width: 150px"></Column>
+                <Column field="is_active" header="Status" sortable style="min-width: 150px">
+                    <template #body="slotProps">
+                        <Tag class="uppercase" :value="slotProps.data.is_active ? 'Active' : 'Inactive'" :severity="slotProps.data.is_active ? 'success' : 'danger'" />
+                    </template>
+                </Column>
+                <Column header="Actions" alignFrozen="right" style="min-width: 150px" frozen :exportable="false">
+                    <template #body="slotProps">
                         <div class="flex items-center">
-                            <!-- <router-link class="font-medium no-underline ml-2 text-right cursor-pointer text-blue-500" :to="`/repositories/${data.id}/commits`">
-                                <Button v-tooltip="{ value: 'View Commits', hideDelay: 1000 }" icon="pi pi-eye" class="mx-2 p-button-primary mx-2" rounded></Button>
-                            </router-link>
- -->
-                            <Button icon="pi pi-trash" class="mx-2 p-button-danger" rounded @click="openConfirmation(data.id)" />
-                            <ToggleSwitch v-tooltip="{ value: 'Disable this Repository', hideDelay: 1000 }" :modelValue="!data.is_disabled" class="mx-2" @change="handleToggleChange(data.id, data.is_disabled)" />
+                            <Button icon="pi pi-trash" class="mr-1" outlined rounded severity="danger" @click="openConfirmation(slotProps.data.id)" />
+                            <ToggleSwitch
+                                v-model="slotProps.data.is_active"
+                                v-tooltip="{ value: slotProps.data.is_active ? 'Deactivate this Token' : 'Activate this Token', hideDelay: 1000 }"
+                                class="ml-1"
+                                @change="handleToggleChange(slotProps.data.id, slotProps.data.is_active)"
+                            />
                         </div>
                     </template>
                 </Column>
             </DataTable>
         </div>
 
-        <Dialog header="Confirmation" v-model:visible="displayConfirmation" :style="{ width: '350px' }" :modal="true">
-            <div class="flex items-center justify-center">
-                <i class="pi pi-exclamation-triangle mr-4" style="font-size: 2rem" />
-                <span>Are you sure you want to proceed?</span>
+        <Dialog v-model:visible="displayConfirmation" :style="{ width: '450px' }" header="Confirm" :modal="true">
+            <div class="flex items-center gap-4">
+                <i class="pi pi-exclamation-triangle !text-3xl" />
+                <span>Are you sure you want to delete this token?</span>
             </div>
             <template #footer>
-                <Button label="No" icon="pi pi-times" @click="closeConfirmation" text severity="secondary" />
-                <Button label="Yes" icon="pi pi-check" @click="confirmDeletion" severity="danger" outlined autofocus />
+                <Button label="No" icon="pi pi-times" severity="info" @click="closeConfirmation" />
+                <Button label="Delete" icon="pi pi-check" severity="danger" @click="confirmDeletion" />
             </template>
         </Dialog>
     </div>

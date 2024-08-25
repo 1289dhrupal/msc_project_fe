@@ -1,5 +1,6 @@
 <script setup>
 import { useLayout } from '@/layout/composables/layout'; // Assuming you have this composable
+import { useToast } from 'primevue/usetoast';
 import { onMounted, ref, watch } from 'vue';
 
 const monthlyCommitData = ref(null);
@@ -13,8 +14,7 @@ const radarOptions = ref(null);
 
 const chartData = ref({});
 const stats = ref({});
-const errorMessage = ref('');
-const successMessage = ref('');
+const toast = useToast();
 
 const { getPrimary, getSurface, isDarkTheme } = useLayout();
 const apiUrl = import.meta.env.VITE_API_URL;
@@ -53,9 +53,9 @@ async function fetchDataAndInitializeCharts() {
 
         // Initialize chart data and options
         initializeCharts();
-        successMessage.value = 'Dashboard data retrieved successfully!';
+        toast.add({ severity: 'success', summary: 'Successfull', detail: 'Dashboard data retrieved successfully!', life: 3000 });
     } catch (error) {
-        errorMessage.value = error.message;
+        toast.add({ severity: 'error', summary: 'Error', detail: error.message, life: 3000 });
     }
 }
 
@@ -216,13 +216,8 @@ watch([getPrimary, getSurface, isDarkTheme], () => {
 </script>
 
 <template>
-    <div class="py-4">
+    <div class="pt-4">
         <h1 class="text-2xl font-bold mb-4">Dashboard</h1>
-
-        <div class="flex flex-col gap-4 mb-4" style="min-height: 50px">
-            <Message v-if="successMessage" severity="success">{{ successMessage }}</Message>
-            <Message v-if="errorMessage" severity="error">{{ errorMessage }}</Message>
-        </div>
 
         <div class="grid grid-cols-12 gap-8">
             <div class="col-span-12 lg:col-span-6 xl:col-span-3">

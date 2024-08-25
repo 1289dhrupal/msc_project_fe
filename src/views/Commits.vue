@@ -1,16 +1,22 @@
 <script setup>
+import { FilterMatchMode } from '@primevue/core/api';
+import { useToast } from 'primevue/usetoast';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 const commits = ref([]);
 const repositories = ref([]);
-const errorMessage = ref('');
-const successMessage = ref('');
 const searchQuery = ref('');
 const apiUrl = import.meta.env.VITE_API_URL;
 
 const route = useRoute();
 const router = useRouter();
+const toast = useToast();
+const dt = ref(null); // Reference for the DataTable
+
+const filters = ref({
+    global: { value: null, matchMode: FilterMatchMode.CONTAINS }
+});
 
 const fetchCommits = async (repositoryId) => {
     try {
@@ -34,10 +40,10 @@ const fetchCommits = async (repositoryId) => {
             commits.value = data.data.commits;
             repositories.value = data.data.repositories;
         } else {
-            errorMessage.value = 'Failed to retrieve commits.';
+            toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to retrieve commits.', life: 3000 });
         }
     } catch (error) {
-        errorMessage.value = error.message;
+        toast.add({ severity: 'error', summary: 'Error', detail: error.message, life: 3000 });
     }
 };
 
@@ -68,6 +74,10 @@ const computedCommits = computed(() => {
     });
 });
 
+const exportCSV = () => {
+    dt.value.exportCSV();
+};
+
 watch(route, (newRoute) => {
     if (!newRoute.query.git_token_id) {
         fetchCommits();
@@ -78,77 +88,80 @@ const goBack = () => {
     router.push('/repositories');
 };
 </script>
+
 <template>
-    <div class="p-4">
-        <h1 class="text-2xl font-bold mb-4">Commit History</h1>
+    <div class="pt-4">
+        <h1 class="text-2xl font-bold mb-4">List of Recent Commits</h1>
 
         <div class="mb-4">
             <Button label="Go Back to Repositories" icon="pi pi-arrow-left" class="p-button-secondary" @click="goBack" />
         </div>
 
-        <div class="flex justify-between items-center mb-4">
-            <div class="w-full max-w-xs">
-                <InputText v-model="searchQuery" placeholder="Search by author or message" class="w-full" />
-            </div>
-        </div>
-
-        <div class="flex flex-col gap-4 mb-4" style="min-height: 50px">
-            <Message v-if="successMessage" severity="success">{{ successMessage }}</Message>
-            <Message v-if="errorMessage" severity="error">{{ errorMessage }}</Message>
-        </div>
-
-        <div class="card mt-6">
-            <div class="font-semibold text-xl mb-4">Commits List ({{ computedCommits.length !== 0 ? (route.params.id ? computedCommits.length : 'Recent 20') : 'No commits found' }})</div>
-
-            <DataTable :value="computedCommits" scrollable scrollHeight="400px" class="mt-6">
-                <!-- Display the last 7 characters of the SHA with a link to the commit URL -->
-                <template>
-                    <Column field="sha" header="SHA" style="min-width: 250px">
-                        <template #body="{ data }">
-                            <div class="flex items-center">
-                                <span class="mr-2">{{ data.shortSha }}</span>
-                                <a :href="data.commitUrl" target="_blank" class="text-blue-500 underline">
-                                    <i class="pi pi-external-link" />
-                                </a>
-                            </div>
-                        </template>
-                    </Column>
+        <div class="card">
+            <Toolbar class="mb-6">
+                <template #start v-if="!route.query.git_token_id">
+                    <!-- Dropdown to select token (only shown when not filtering by token) -->
+                    <Select v-model="selectedTokenId" :options="gitTokens" optionLabel="token" placeholder="Select a Token to filter repositories" class="w-full" @change="onTokenSelect" />
                 </template>
-                <Column field="repositoryName" header="Repository" style="min-width: 250px"></Column>
+                <template #end>
+                    <Button label="Export" icon="pi pi-upload" severity="secondary" @click="exportCSV" />
+                </template>
+            </Toolbar>
 
-                <Column field="author" header="Author" style="min-width: 150px"></Column>
-                <Column field="message" header="Message" style="min-width: 300px"></Column>
-                <Column field="date" header="Date" style="min-width: 200px"></Column>
+            <!-- :exportFunction="customExportFunction" -->
+            <DataTable
+                ref="dt"
+                :value="computedCommits"
+                :exportFilename="`commits_${new Date().getTime()}`"
+                :paginator="true"
+                :rows="10"
+                :filters="filters"
+                scrollable
+                paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
+                :rowsPerPageOptions="[5, 10, 25]"
+                currentPageReportTemplate="Showing {first} to {last} of {totalRecords} commits"
+            >
+                <template #header>
+                    <div class="flex flex-wrap gap-2 items-center justify-between">
+                        <div class="font-semibold text-xl mb-4">Commits List ({{ computedCommits.length !== 0 ? computedCommits.length : 'No commits found' }})</div>
+                        <InputText v-model="filters['global'].value" placeholder="Search..." />
+                    </div>
+                </template>
 
-                <!-- Additions with success tag -->
-                <Column field="additions" header="Additions" style="min-width: 150px">
-                    <template #body="{ data }">
-                        <Tag icon="pi pi-check" severity="success" :value="data.additions" class="w-full text-center">
-                            <div class="flex justify-start items-center w-full">
-                                <span class="flex-grow text-center">{{ data.additions }}</span>
-                            </div>
-                        </Tag>
+                <!-- Display the last 7 characters of the SHA with a link to the commit URL -->
+                <Column field="sha" header="SHA" sortable style="min-width: 200px">
+                    <template #body="slotProps">
+                        <div class="flex items-center">
+                            <span class="mr-2">{{ slotProps.data.shortSha }}</span>
+                            <a :href="slotProps.data.commitUrl" target="_blank" class="text-blue-500 underline">
+                                <i class="pi pi-external-link" />
+                            </a>
+                        </div>
                     </template>
                 </Column>
 
-                <!-- Deletions with danger tag -->
-                <Column field="deletions" header="Deletions" style="min-width: 150px">
-                    <template #body="{ data }">
-                        <Tag icon="pi pi-times" severity="danger" :value="data.deletions" class="w-full text-center">
-                            <div class="flex justify-start items-center w-full">
-                                <span class="flex-grow text-center">{{ data.deletions }}</span>
-                            </div>
+                <Column field="repositoryName" header="Repository" sortable style="min-width: 250px"></Column>
+                <Column field="author" header="Author" sortable style="min-width: 150px"></Column>
+                <Column field="message" header="Message" sortable style="min-width: 300px"></Column>
+                <Column field="date" header="Date" sortable style="min-width: 200px"></Column>
+                <Column field="additions" header="Additions" sortable style="min-width: 150px">
+                    <template #body="slotProps">
+                        <Tag icon="pi pi-check" severity="success" :value="slotProps.data.additions" class="w-full">
+                            <span class="flex-grow text-center">{{ slotProps.data.additions }}</span>
                         </Tag>
                     </template>
                 </Column>
-
-                <!-- Total Changes with info tag -->
-                <Column field="total" header="Total Changes" style="min-width: 150px">
-                    <template #body="{ data }">
-                        <Tag icon="pi pi-info-circle" severity="info" :value="data.total" class="w-full text-center">
-                            <div class="flex justify-start items-center w-full">
-                                <span class="flex-grow text-center">{{ data.total }}</span>
-                            </div>
+                <Column field="deletions" header="Deletions" sortable style="min-width: 150px">
+                    <template #body="slotProps">
+                        <Tag icon="pi pi-times" severity="danger" :value="slotProps.data.deletions" class="w-full">
+                            <span class="flex-grow text-center">{{ slotProps.data.deletions }}</span>
+                        </Tag>
+                    </template>
+                </Column>
+                <Column field="total" header="Total" sortable style="min-width: 150px">
+                    <template #body="slotProps">
+                        <Tag icon="pi pi-info-circle" severity="info" :value="slotProps.data.total" class="w-full">
+                            <span class="flex-grow text-center">{{ slotProps.data.total }}</span>
                         </Tag>
                     </template>
                 </Column>
