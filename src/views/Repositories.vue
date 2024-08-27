@@ -209,13 +209,12 @@ watch(route, (newRoute) => {
                 <Column field="url" header="Repository" sortable style="min-width: 200px">
                     <template #body="slotProps">
                         <div class="flex items-center">
-                            <router-link class="font-bold underline text-right text-primary mr-1" :to="`/repositories/${slotProps.data.id}/commits`">
-                                <span v-tooltip="{ value: 'View Commits', hideDelay: 100 }" class="ml-1">{{ slotProps.data.owner }}/{{ slotProps.data.name }}</span>
-                            </router-link>
-
                             <a :href="slotProps.data.url" target="_blank" class="text-blue-500 underline">
                                 <i class="pi pi-external-link" />
                             </a>
+                            <router-link class="font-bold underline text-right text-primary ml-1" :to="`/repositories/${slotProps.data.id}/commits`">
+                                <span v-tooltip="{ value: 'View Commits', hideDelay: 100 }" class="ml-1">{{ slotProps.data.owner }}/{{ slotProps.data.name }}</span>
+                            </router-link>
                         </div>
                     </template>
                 </Column>
@@ -236,6 +235,7 @@ watch(route, (newRoute) => {
                 <Column header="Actions" alignFrozen="right" style="min-width: 150px" frozen :exportable="false">
                     <template #body="slotProps">
                         <div class="flex items-center">
+                            <Button icon="pi pi-chart-line" class="mr-1" v-tooltip="{ value: 'View Analysis', hideDelay: 100 }" outlined rounded severity="info" @click="openConfirmation(slotProps.data.id)" />
                             <Button icon="pi pi-trash" class="mr-1" outlined rounded severity="danger" @click="openConfirmation(slotProps.data.id)" />
                             <ToggleSwitch
                                 v-model="slotProps.data.is_active"

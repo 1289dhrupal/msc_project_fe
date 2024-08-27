@@ -165,6 +165,13 @@ const goBack = () => {
                         </Tag>
                     </template>
                 </Column>
+                <Column header="Actions" :exportable="false" alignFrozen="right" frozen style="min-width: 150px">
+                    <template #body="slotProps">
+                        <div class="flex items-center">
+                            <Button icon="pi pi-chart-line" class="mr-1" v-tooltip="{ value: 'View Analysis', hideDelay: 100 }" outlined rounded severity="info" @click="openConfirmation(slotProps.data.id)" />
+                        </div>
+                    </template>
+                </Column>
             </DataTable>
         </div>
     </div>

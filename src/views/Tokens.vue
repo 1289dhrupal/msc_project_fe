@@ -248,10 +248,10 @@ watch(newService, (service) => {
                 <Column field="service" header="Service" sortable style="min-width: 150px">
                     <template #body="slotProps">
                         <div class="flex items-center">
-                            <span class="mr-1 font-bold" style="text-transform: capitalize">{{ slotProps.data.service }}</span>
                             <a :href="slotProps.data.url" target="_blank" class="ml-1 text-blue-500 underline">
                                 <i class="pi pi-external-link" />
                             </a>
+                            <span class="ml-1 font-bold" style="text-transform: capitalize">{{ slotProps.data.service }}</span>
                         </div>
                     </template>
                 </Column>
@@ -271,6 +271,7 @@ watch(newService, (service) => {
                 <Column header="Actions" :exportable="false" alignFrozen="right" frozen style="min-width: 150px">
                     <template #body="slotProps">
                         <div class="flex items-center">
+                            <Button icon="pi pi-chart-line" class="mr-1" v-tooltip="{ value: 'View Analysis', hideDelay: 100 }" outlined rounded severity="info" @click="openConfirmation(slotProps.data.id)" />
                             <Button icon="pi pi-trash" class="mr-1" outlined rounded severity="danger" @click="openConfirmation(slotProps.data.id)" />
                             <ToggleSwitch
                                 v-model="slotProps.data.is_active"
