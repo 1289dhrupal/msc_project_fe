@@ -11,7 +11,20 @@ const searchQuery = ref('');
 const apiUrl = import.meta.env.VITE_API_URL;
 
 const displayConfirmation = ref(false);
+const displayStatsDialog = ref(false);
 const selectedRepositoryId = ref(null);
+const repositoryStats = ref(null);
+const combinedChartData = ref();
+const combinedChartOptions = ref();
+const contributionChartData = ref();
+const contributionChartOptions = ref();
+const leadTimeChartData = ref();
+const leadTimeChartOptions = ref();
+const contributionPieChartData = ref();
+const contributionPieChartOptions = ref();
+const netContributionPieChartData = ref();
+const netContributionPieChartOptions = ref();
+
 const filters = ref({
     global: { value: null, matchMode: FilterMatchMode.CONTAINS }
 });
@@ -141,6 +154,293 @@ const confirmDeletion = () => {
     closeConfirmation();
 };
 
+const fetchRepositoryStats = async (id) => {
+    try {
+        const response = await fetch(`${apiUrl}/git/repositories/${id}/stats`, {
+            method: 'GET',
+            headers: {
+                Authorization: localStorage.getItem('apiKey'),
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) throw new Error('Failed to fetch repository stats');
+
+        const data = await response.json();
+        if (data.success) {
+            repositoryStats.value = data.data;
+            prepareChartData();
+            displayStatsDialog.value = true;
+        } else {
+            toast.add({ severity: 'error', summary: 'Error', detail: data.message || 'Failed to fetch repository stats.', life: 3000 });
+        }
+    } catch (error) {
+        toast.add({ severity: 'error', summary: 'Error', detail: error.message, life: 3000 });
+    }
+};
+
+const prepareChartData = () => {
+    const documentStyle = getComputedStyle(document.documentElement);
+
+    const labels = repositoryStats.value.churn_rates.map((_, index) => `Commit ${index + 1}`);
+    const churnRates = repositoryStats.value.churn_rates.map((stat) => stat.churn_rate);
+    const additions = repositoryStats.value.churn_rates.map((stat) => stat.additions);
+    const deletions = repositoryStats.value.churn_rates.map((stat) => stat.deletions);
+
+    combinedChartData.value = {
+        labels: labels,
+        datasets: [
+            {
+                label: 'Additions',
+                type: 'bar',
+                backgroundColor: documentStyle.getPropertyValue('--p-gray-500'),
+                data: additions
+            },
+            {
+                label: 'Deletions',
+                type: 'bar',
+                backgroundColor: documentStyle.getPropertyValue('--p-orange-500'),
+                data: deletions
+            }
+        ]
+    };
+
+    combinedChartOptions.value = {
+        stacked: false,
+        maintainAspectRatio: false,
+        aspectRatio: 0.6,
+        plugins: {
+            legend: {
+                labels: {
+                    color: documentStyle.getPropertyValue('--p-text-color')
+                }
+            }
+        },
+        scales: {
+            x: {
+                ticks: {
+                    color: documentStyle.getPropertyValue('--p-text-muted-color')
+                },
+                grid: {
+                    color: documentStyle.getPropertyValue('--p-content-border-color')
+                }
+            },
+            y: {
+                type: 'linear',
+                display: true,
+                position: 'left',
+                ticks: {
+                    color: documentStyle.getPropertyValue('--p-text-muted-color'),
+                    beginAtZero: true
+                },
+                grid: {
+                    color: documentStyle.getPropertyValue('--p-content-border-color')
+                },
+                title: {
+                    display: true,
+                    text: 'Additions/Deletions',
+                    color: documentStyle.getPropertyValue('--p-text-color')
+                }
+            }
+        }
+    };
+
+    // Prepare contribution chart data
+    const contributors = Object.keys(repositoryStats.value.contribution);
+    const additionValues = contributors.map((contributor) => repositoryStats.value.contribution[contributor].additions);
+    const deletionValues = contributors.map((contributor) => repositoryStats.value.contribution[contributor].deletions);
+
+    contributionChartData.value = {
+        labels: contributors,
+        datasets: [
+            {
+                label: 'Additions',
+                backgroundColor: documentStyle.getPropertyValue('--p-green-500'),
+                data: additionValues
+            },
+            {
+                label: 'Deletions',
+                backgroundColor: documentStyle.getPropertyValue('--p-red-500'),
+                data: deletionValues
+            }
+        ]
+    };
+
+    contributionChartOptions.value = {
+        maintainAspectRatio: false,
+        aspectRatio: 0.6,
+        plugins: {
+            legend: {
+                labels: {
+                    color: documentStyle.getPropertyValue('--p-text-color')
+                }
+            }
+        },
+        scales: {
+            x: {
+                stacked: true,
+                ticks: {
+                    color: documentStyle.getPropertyValue('--p-text-muted-color')
+                },
+                grid: {
+                    color: documentStyle.getPropertyValue('--p-content-border-color')
+                }
+            },
+            y: {
+                stacked: true,
+                ticks: {
+                    color: documentStyle.getPropertyValue('--p-text-muted-color'),
+                    beginAtZero: true
+                },
+                grid: {
+                    color: documentStyle.getPropertyValue('--p-content-border-color')
+                }
+            }
+        }
+    };
+
+    contributionPieChartOptions.value = {
+        plugins: {
+            legend: {
+                labels: {
+                    color: documentStyle.getPropertyValue('--p-text-color')
+                }
+            }
+        },
+        maintainAspectRatio: false,
+        aspectRatio: 1.2
+    };
+
+    // Prepare contribution pie chart data
+    const totalChanges = contributors.map((contributor) => repositoryStats.value.contribution[contributor].total);
+    contributionPieChartData.value = {
+        labels: contributors,
+        datasets: [
+            {
+                label: 'Total Changes',
+                backgroundColor: [documentStyle.getPropertyValue('--p-green-500'), documentStyle.getPropertyValue('--p-blue-500'), documentStyle.getPropertyValue('--p-orange-500')],
+                data: totalChanges
+            }
+        ]
+    };
+
+    const leadTimes = repositoryStats.value.churn_rates.map((stat) => parseInt(stat.lead_time.trim(), 10));
+
+    // Prepare Lead Time Metrics Chart
+    leadTimeChartData.value = {
+        labels: labels, // Reusing the labels from the commits (Commit 1, Commit 2, etc.)
+        datasets: [
+            {
+                label: 'Lead Time (days)',
+                data: leadTimes,
+                borderColor: documentStyle.getPropertyValue('--p-blue-500'),
+                backgroundColor: 'rgba(33, 150, 243, 0.2)',
+                fill: true,
+                tension: 0.4,
+                yAxisID: 'y'
+            },
+            {
+                label: 'Churn Rate (%)',
+                type: 'line',
+                tension: 0.4,
+                borderColor: documentStyle.getPropertyValue('--p-cyan-500'),
+                backgroundColor: 'rgba(66, 165, 245, 0.2)',
+                fill: false,
+                data: churnRates,
+                yAxisID: 'y1'
+            }
+        ]
+    };
+
+    leadTimeChartOptions.value = {
+        maintainAspectRatio: false,
+        aspectRatio: 0.6,
+        plugins: {
+            legend: {
+                labels: {
+                    color: documentStyle.getPropertyValue('--p-text-color')
+                }
+            }
+        },
+        scales: {
+            x: {
+                ticks: {
+                    color: documentStyle.getPropertyValue('--p-text-muted-color')
+                },
+                grid: {
+                    color: documentStyle.getPropertyValue('--p-content-border-color')
+                }
+            },
+            y: {
+                ticks: {
+                    color: documentStyle.getPropertyValue('--p-text-muted-color'),
+                    beginAtZero: true
+                },
+                grid: {
+                    color: documentStyle.getPropertyValue('--p-content-border-color')
+                },
+                title: {
+                    display: true,
+                    text: 'Lead Time (days)',
+                    color: documentStyle.getPropertyValue('--p-text-color')
+                }
+            },
+            y1: {
+                type: 'linear',
+                display: true,
+                position: 'right',
+                ticks: {
+                    color: documentStyle.getPropertyValue('--p-text-muted-color'),
+                    beginAtZero: true,
+                    max: 100 // Churn rate max at 100%
+                },
+                grid: {
+                    drawOnChartArea: false,
+                    color: documentStyle.getPropertyValue('--p-content-border-color')
+                },
+                title: {
+                    display: true,
+                    text: 'Churn Rate (%)',
+                    color: documentStyle.getPropertyValue('--p-text-color')
+                }
+            }
+        }
+    };
+
+    const netContributions = contributors.map((contributor) => {
+        const { additions, deletions } = repositoryStats.value.contribution[contributor];
+        return additions - deletions;
+    });
+
+    // Prepare Net Code Contribution Pie Chart
+    netContributionPieChartData.value = {
+        labels: contributors,
+        datasets: [
+            {
+                label: 'Net Contributions',
+                backgroundColor: [documentStyle.getPropertyValue('--p-green-500'), documentStyle.getPropertyValue('--p-blue-500'), documentStyle.getPropertyValue('--p-orange-500')],
+                data: netContributions
+            }
+        ]
+    };
+
+    netContributionPieChartOptions.value = {
+        plugins: {
+            legend: {
+                labels: {
+                    color: documentStyle.getPropertyValue('--p-text-color')
+                }
+            }
+        },
+        maintainAspectRatio: false,
+        aspectRatio: 1.2
+    };
+};
+
+const openStatsDialog = (id) => {
+    fetchRepositoryStats(id);
+};
+
 const customExportFunction = (cell) => {
     switch (cell.field) {
         case 'is_active':
@@ -154,6 +454,44 @@ const exportCSV = () => {
     dt.value.exportCSV();
 };
 
+const isTokenInactive = (repository) => {
+    const token = gitTokens.value.find((token) => token.id === repository.git_token_id);
+    return token ? !token.is_active : true;
+};
+
+const topContributor = computed(() => {
+    const contributors = Object.entries(repositoryStats.value.contribution || {});
+    if (!contributors.length) return 'N/A';
+
+    const sortedContributors = contributors.sort((a, b) => {
+        const totalAdditionsA = a[1].additions;
+        const totalAdditionsB = b[1].additions;
+        return totalAdditionsB - totalAdditionsA;
+    });
+
+    return sortedContributors[0][0]; // Return the username of the top contributor
+});
+
+const codebaseStability = computed(() => {
+    if (!repositoryStats.value.churn_rates.length) return 'N/A';
+
+    const totalChurnRate = repositoryStats.value.churn_rates.reduce((acc, curr) => acc + curr.churn_rate, 0);
+    const totalCommits = repositoryStats.value.churn_rates.length;
+
+    return (totalChurnRate / totalCommits).toFixed(2); // Average churn rate
+});
+
+const totalCommits = computed(() => {
+    return repositoryStats.value.churn_rates ? repositoryStats.value.churn_rates.length : 0;
+});
+
+const totalChanges = computed(() => {
+    if (!repositoryStats.value.churn_rates) return 0;
+
+    return repositoryStats.value.churn_rates.reduce((acc, curr) => {
+        return acc + curr.additions + Math.abs(curr.deletions);
+    }, 0);
+});
 onMounted(() => {
     fetchRepositories(route.query.git_token_id);
 });
@@ -235,8 +573,8 @@ watch(route, (newRoute) => {
                 <Column header="Actions" alignFrozen="right" style="min-width: 150px" frozen :exportable="false">
                     <template #body="slotProps">
                         <div class="flex items-center">
-                            <Button icon="pi pi-chart-line" class="mr-1" v-tooltip="{ value: 'View Analysis', hideDelay: 100 }" outlined rounded severity="info" @click="openConfirmation(slotProps.data.id)" />
-                            <Button icon="pi pi-trash" class="mr-1" outlined rounded severity="danger" @click="openConfirmation(slotProps.data.id)" />
+                            <Button icon="pi pi-chart-line" class="mr-1" v-tooltip="{ value: 'View Analysis', hideDelay: 100 }" outlined rounded severity="info" @click="openStatsDialog(slotProps.data.id)" />
+                            <Button :disabled="isTokenInactive(slotProps.data)" icon="pi pi-trash" class="mr-1" outlined rounded severity="danger" @click="openConfirmation(slotProps.data.id)" />
                             <ToggleSwitch
                                 v-model="slotProps.data.is_active"
                                 v-tooltip="{ value: slotProps.data.is_active ? 'Deactivate this Token' : 'Activate this Token', hideDelay: 1000 }"
@@ -258,6 +596,132 @@ watch(route, (newRoute) => {
                 <Button label="No" icon="pi pi-times" severity="info" @click="closeConfirmation" />
                 <Button label="Delete" icon="pi pi-check" severity="danger" @click="confirmDeletion" />
             </template>
+        </Dialog>
+
+        <Dialog v-model:visible="displayStatsDialog" :style="{ width: '90vw' }" class="" header="Repository Analysis" :modal="true">
+            <div class="grid grid-cols-12 gap-8">
+                <div class="col-span-12 lg:col-span-6 xl:col-span-3">
+                    <div class="card mb-0">
+                        <div class="flex justify-between mb-4">
+                            <div>
+                                <span class="block text-muted-color font-medium mb-4">Total commits</span>
+                                <div class="text-surface-900 dark:text-surface-0 font-medium text-xl">{{ totalCommits }}</div>
+                            </div>
+                            <div class="flex items-center justify-center bg-blue-100 dark:bg-blue-400/10 rounded-border" style="width: 2.5rem; height: 2.5rem">
+                                <i class="pi pi-github text-blue-500 !text-xl"></i>
+                            </div>
+                        </div>
+
+                        <div class="flex">
+                            <Tag class="mr-1" style="background: none" icon="pi pi-info-circle" severity="info" :rounded="true"></Tag>
+                            <small class="text-muted-color"> The total number of commits made to the codebase. </small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-span-12 lg:col-span-6 xl:col-span-3">
+                    <div class="card mb-0">
+                        <div class="flex justify-between mb-4">
+                            <div>
+                                <span class="block text-muted-color font-medium mb-4">Codebase Stability</span>
+                                <div class="text-surface-900 dark:text-surface-0 font-medium text-xl">{{ codebaseStability }}</div>
+                            </div>
+                            <div class="flex items-center justify-center bg-orange-100 dark:bg-orange-400/10 rounded-border" style="width: 2.5rem; height: 2.5rem">
+                                <i class="pi pi-shield text-orange-500 !text-xl"></i>
+                            </div>
+                        </div>
+
+                        <div class="flex">
+                            <Tag class="mr-1" style="background: none" icon="pi pi-info-circle" severity="info" :rounded="true"></Tag>
+                            <small class="text-muted-color"> A higher number suggests greater volatility. </small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-span-12 lg:col-span-6 xl:col-span-3">
+                    <div class="card mb-0">
+                        <div class="flex justify-between mb-4">
+                            <div>
+                                <span class="block text-muted-color font-medium mb-4">Total Changes</span>
+                                <div class="text-surface-900 dark:text-surface-0 font-medium text-xl">{{ totalChanges }}</div>
+                            </div>
+                            <div class="flex items-center justify-center bg-cyan-100 dark:bg-cyan-400/10 rounded-border" style="width: 2.5rem; height: 2.5rem">
+                                <i class="pi pi-file-edit text-cyan-500 !text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="flex">
+                            <Tag class="mr-1" style="background: none" icon="pi pi-info-circle" severity="info" :rounded="true"></Tag>
+                            <small class="text-muted-color"> The total number of changes made to the codebase. </small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-span-12 lg:col-span-6 xl:col-span-3">
+                    <div class="card mb-0">
+                        <div class="flex justify-between mb-4">
+                            <div>
+                                <span class="block text-muted-color font-medium mb-4">Top Contributor</span>
+                                <div class="text-surface-900 dark:text-surface-0 font-medium text-xl">{{ topContributor }}</div>
+                            </div>
+                            <div class="flex items-center justify-center bg-purple-100 dark:bg-purple-400/10 rounded-border" style="width: 2.5rem; height: 2.5rem">
+                                <i class="pi pi-user text-purple-500 !text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="flex">
+                            <Tag class="mr-1" style="background: none" icon="pi pi-info-circle" severity="info" :rounded="true"></Tag>
+                            <small class="text-muted-color"> The user with the most contributions to the codebase. </small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-span-12 xl:col-span-6">
+                    <div class="col-span-12">
+                        <!-- Combined Additions, Deletions, and Churn Rate Chart -->
+                        <div class="card">
+                            <div class="font-semibold text-xl mb-4">Additions, Deletions, and Churn Rate</div>
+                            <Chart type="bar" :data="combinedChartData" :options="combinedChartOptions" class="h-[20rem]" />
+                            <p class="mt-4 text-sm text-muted">This chart shows the number of additions and deletions made in each commit, along with the churn rate, providing insights into the code changes and their impact over time.</p>
+                        </div>
+                    </div>
+
+                    <div class="col-span-12">
+                        <!-- Lead Time Chart -->
+                        <div class="card">
+                            <div class="font-semibold text-xl mb-4">Lead Time Metrics</div>
+                            <Chart type="line" :data="leadTimeChartData" :options="leadTimeChartOptions" class="h-[20rem]" />
+                            <p class="mt-4 text-sm text-muted">This chart shows the lead time for each commit, providing insights into the development pipeline's efficiency.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-span-12 xl:col-span-6">
+                    <div class="col-span-12">
+                        <!-- Net Code Contribution -->
+                        <div class="card">
+                            <div class="font-semibold text-xl mb-4">Net Code Contribution Per User</div>
+                            <Chart type="pie" :data="netContributionPieChartData" :options="netContributionPieChartOptions" class="h-[20rem]" />
+                            <p class="mt-4 text-sm text-muted">This pie chart shows the net code contribution (additions minus deletions) for each contributor, reflecting their overall impact on the codebase.</p>
+                        </div>
+                    </div>
+
+                    <div class="col-span-12">
+                        <!-- Contribution Chart -->
+                        <div class="card">
+                            <div class="font-semibold text-xl mb-4">Code Contribution Distribution</div>
+                            <Chart type="pie" :data="contributionPieChartData" :options="contributionPieChartOptions" class="h-[20rem]" />
+                            <p class="mt-4 text-sm text-muted">This pie chart shows the distribution of total code changes (additions and deletions) by each contributor.</p>
+                        </div>
+                    </div>
+
+                    <div class="col-span-12">
+                        <!-- Contribution Chart -->
+                        <div class="card">
+                            <div class="font-semibold text-xl mb-4">Contributor Contributions</div>
+                            <Chart type="bar" :data="contributionChartData" :options="contributionChartOptions" class="h-[20rem]" />
+                            <p class="mt-4 text-sm text-muted">This chart compares the contributions of different users in terms of additions and deletions.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </Dialog>
     </div>
 </template>

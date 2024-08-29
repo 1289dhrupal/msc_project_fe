@@ -25,7 +25,7 @@ onMounted(async () => {
 
 async function fetchDataAndInitializeCharts() {
     try {
-        const response = await fetch(`${apiUrl}/dashboard/commitFrequency`, {
+        const response = await fetch(`${apiUrl}/dashboard/overallStats`, {
             method: 'GET',
             headers: {
                 Authorization: localStorage.getItem('apiKey'),
