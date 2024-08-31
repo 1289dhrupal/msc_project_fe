@@ -10,6 +10,7 @@ const newService = ref(null);
 const newDescription = ref('');
 const apiUrl = import.meta.env.VITE_API_URL;
 const displayConfirmation = ref(false);
+const isEdit = ref(false);
 const selectedTokenId = ref(null);
 const dropdownItems = ref(
     import.meta.env.VITE_SERVICE_OPTIONS.split(',').map((service) => ({
@@ -58,6 +59,48 @@ const addToken = async () => {
 
     try {
         const response = await fetch(`${apiUrl}/git-token/store`, {
+            method: 'POST',
+            headers: {
+                Authorization: localStorage.getItem('apiKey'),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                token: newToken.value,
+                url: newUrl.value,
+                service: newService.value.code,
+                description: newDescription.value
+            })
+        });
+
+        if (!response.ok) throw new Error('Failed to add token');
+
+        const data = await response.json();
+        if (data.success) {
+            toast.add({ severity: 'success', summary: 'Successful', detail: 'Token added successfully!', life: 3000 });
+            resetForm();
+            fetchTokens();
+            tokenDialog.value = false;
+        } else {
+            toast.add({ severity: 'error', summary: 'Error', detail: data.message || 'Failed to add token.', life: 3000 });
+        }
+    } catch (error) {
+        toast.add({ severity: 'error', summary: 'Error', detail: error.message, life: 3000 });
+    }
+};
+
+const updateToken = async () => {
+    if (selectedTokenId.value === null) {
+        return;
+    }
+
+    submitted.value = true;
+
+    if (!newService.value || !newToken.value || !newUrl.value || newDescription.value.length > 150) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${apiUrl}/git-token/${selectedTokenId.value}/edit`, {
             method: 'POST',
             headers: {
                 Authorization: localStorage.getItem('apiKey'),
@@ -165,6 +208,21 @@ const openNewTokenDialog = () => {
     tokenDialog.value = true;
 };
 
+const openEditTokenDialog = (id) => {
+    tokens.value.filter((token) => {
+        if (token.id === id) {
+            newToken.value = token.token;
+            newUrl.value = token.url;
+            newService.value = dropdownItems.value.find((item) => item.code === token.service);
+            newDescription.value = token.description;
+            submitted.value = false;
+            tokenDialog.value = true;
+            selectedTokenId.value = id;
+            isEdit.value = true;
+        }
+    });
+};
+
 const hideDialog = () => {
     tokenDialog.value = false;
     submitted.value = false;
@@ -198,7 +256,7 @@ watch(newService, (service) => {
     if (service && service.code === 'github') {
         newUrl.value = 'https://github.com';
     } else {
-        newUrl.value = '';
+        // newUrl.value = '';
     }
 });
 </script>
@@ -271,6 +329,7 @@ watch(newService, (service) => {
                 <Column header="Actions" :exportable="false" alignFrozen="right" frozen style="min-width: 150px">
                     <template #body="slotProps">
                         <div class="flex items-center">
+                            <Button icon="pi pi-pencil" class="ml-1" v-tooltip="{ value: 'Edit Token', hideDelay: 100 }" outlined rounded severity="warning" @click="openEditTokenDialog(slotProps.data.id)" />
                             <Button icon="pi pi-chart-line" class="mr-1" v-tooltip="{ value: 'View Analysis', hideDelay: 100 }" outlined rounded severity="info" @click="openConfirmation(slotProps.data.id)" />
                             <Button icon="pi pi-trash" class="mr-1" outlined rounded severity="danger" @click="openConfirmation(slotProps.data.id)" />
                             <ToggleSwitch
@@ -315,7 +374,8 @@ watch(newService, (service) => {
 
             <template #footer>
                 <Button label="Cancel" icon="pi pi-times" severity="danger" outlined text @click="hideDialog" />
-                <Button label="Save" icon="pi pi-check" @click="addToken" />
+                <Button v-if="isEdit" label="Save" icon="pi pi-check" @click="updateToken" />
+                <Button v-else label="Save" icon="pi pi-check" @click="addToken" />
             </template>
         </Dialog>
 

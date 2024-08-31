@@ -100,7 +100,7 @@ const submitRegister = async () => {
                         <InputText id="email" type="email" placeholder="Email address" class="w-full md:w-[30rem] mb-8" v-model="email" />
 
                         <label for="password" class="block text-surface-900 dark:text-surface-0 font-medium text-xl mb-2">Password</label>
-                        <Password id="password" v-model="password" placeholder="Password" :toggleMask="true" class="mb-4" fluid :feedback="false"></Password>
+                        <Password id="password" v-model="password" placeholder="Password" :toggleMask="true" class="mb-4" fluid :feedback="true"></Password>
 
                         <div class="flex items-center justify-between mt-2 mb-8 gap-8">
                             <span class="font-medium no-underline ml-2 text-right cursor-pointer text-primary">Already have an account? <router-link to="/auth/login" class="text-primary">Login</router-link></span>

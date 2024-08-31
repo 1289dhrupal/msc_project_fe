@@ -22,8 +22,6 @@ const leadTimeChartData = ref();
 const leadTimeChartOptions = ref();
 const contributionPieChartData = ref();
 const contributionPieChartOptions = ref();
-const netContributionPieChartData = ref();
-const netContributionPieChartOptions = ref();
 
 const filters = ref({
     global: { value: null, matchMode: FilterMatchMode.CONTAINS }
@@ -406,35 +404,6 @@ const prepareChartData = () => {
             }
         }
     };
-
-    const netContributions = contributors.map((contributor) => {
-        const { additions, deletions } = repositoryStats.value.contribution[contributor];
-        return additions - deletions;
-    });
-
-    // Prepare Net Code Contribution Pie Chart
-    netContributionPieChartData.value = {
-        labels: contributors,
-        datasets: [
-            {
-                label: 'Net Contributions',
-                backgroundColor: [documentStyle.getPropertyValue('--p-green-500'), documentStyle.getPropertyValue('--p-blue-500'), documentStyle.getPropertyValue('--p-orange-500')],
-                data: netContributions
-            }
-        ]
-    };
-
-    netContributionPieChartOptions.value = {
-        plugins: {
-            legend: {
-                labels: {
-                    color: documentStyle.getPropertyValue('--p-text-color')
-                }
-            }
-        },
-        maintainAspectRatio: false,
-        aspectRatio: 1.2
-    };
 };
 
 const openStatsDialog = (id) => {
@@ -598,7 +567,7 @@ watch(route, (newRoute) => {
             </template>
         </Dialog>
 
-        <Dialog v-model:visible="displayStatsDialog" :style="{ width: '90vw' }" class="" header="Repository Analysis" :modal="true">
+        <Dialog v-model:visible="displayStatsDialog" :style="{ width: '90vw', backgroundColor: 'var(--surface-ground)' }" class="" header="Repository Analysis" :modal="true">
             <div class="grid grid-cols-12 gap-8">
                 <div class="col-span-12 lg:col-span-6 xl:col-span-3">
                     <div class="card mb-0">
@@ -675,50 +644,33 @@ watch(route, (newRoute) => {
                 </div>
 
                 <div class="col-span-12 xl:col-span-6">
-                    <div class="col-span-12">
-                        <!-- Combined Additions, Deletions, and Churn Rate Chart -->
-                        <div class="card">
-                            <div class="font-semibold text-xl mb-4">Additions, Deletions, and Churn Rate</div>
-                            <Chart type="bar" :data="combinedChartData" :options="combinedChartOptions" class="h-[20rem]" />
-                            <p class="mt-4 text-sm text-muted">This chart shows the number of additions and deletions made in each commit, along with the churn rate, providing insights into the code changes and their impact over time.</p>
-                        </div>
+                    <!-- Combined Additions, Deletions, and Churn Rate Chart -->
+                    <div class="card">
+                        <div class="font-semibold text-xl mb-4">Additions, Deletions, and Churn Rate</div>
+                        <Chart type="bar" :data="combinedChartData" :options="combinedChartOptions" class="h-[20rem]" />
+                        <p class="mt-4 text-sm text-muted">This chart shows the number of additions and deletions made in each commit, along with the churn rate, providing insights into the code changes and their impact over time.</p>
                     </div>
 
-                    <div class="col-span-12">
-                        <!-- Lead Time Chart -->
-                        <div class="card">
-                            <div class="font-semibold text-xl mb-4">Lead Time Metrics</div>
-                            <Chart type="line" :data="leadTimeChartData" :options="leadTimeChartOptions" class="h-[20rem]" />
-                            <p class="mt-4 text-sm text-muted">This chart shows the lead time for each commit, providing insights into the development pipeline's efficiency.</p>
-                        </div>
+                    <!-- Lead Time Chart -->
+                    <div class="card">
+                        <div class="font-semibold text-xl mb-4">Lead Time Metrics</div>
+                        <Chart type="line" :data="leadTimeChartData" :options="leadTimeChartOptions" class="h-[20rem]" />
+                        <p class="mt-4 text-sm text-muted">This chart shows the lead time for each commit, providing insights into the development pipeline's efficiency.</p>
                     </div>
                 </div>
                 <div class="col-span-12 xl:col-span-6">
-                    <div class="col-span-12">
-                        <!-- Net Code Contribution -->
-                        <div class="card">
-                            <div class="font-semibold text-xl mb-4">Net Code Contribution Per User</div>
-                            <Chart type="pie" :data="netContributionPieChartData" :options="netContributionPieChartOptions" class="h-[20rem]" />
-                            <p class="mt-4 text-sm text-muted">This pie chart shows the net code contribution (additions minus deletions) for each contributor, reflecting their overall impact on the codebase.</p>
-                        </div>
+                    <!-- Contribution Chart -->
+                    <div class="card">
+                        <div class="font-semibold text-xl mb-4">Code Contribution Distribution</div>
+                        <Chart type="pie" :data="contributionPieChartData" :options="contributionPieChartOptions" class="h-[20rem]" />
+                        <p class="mt-4 text-sm text-muted">This pie chart shows the distribution of total code changes (additions and deletions) by each contributor.</p>
                     </div>
 
-                    <div class="col-span-12">
-                        <!-- Contribution Chart -->
-                        <div class="card">
-                            <div class="font-semibold text-xl mb-4">Code Contribution Distribution</div>
-                            <Chart type="pie" :data="contributionPieChartData" :options="contributionPieChartOptions" class="h-[20rem]" />
-                            <p class="mt-4 text-sm text-muted">This pie chart shows the distribution of total code changes (additions and deletions) by each contributor.</p>
-                        </div>
-                    </div>
-
-                    <div class="col-span-12">
-                        <!-- Contribution Chart -->
-                        <div class="card">
-                            <div class="font-semibold text-xl mb-4">Contributor Contributions</div>
-                            <Chart type="bar" :data="contributionChartData" :options="contributionChartOptions" class="h-[20rem]" />
-                            <p class="mt-4 text-sm text-muted">This chart compares the contributions of different users in terms of additions and deletions.</p>
-                        </div>
+                    <!-- Contribution Chart -->
+                    <div class="card">
+                        <div class="font-semibold text-xl mb-4">Contributor Contributions</div>
+                        <Chart type="bar" :data="contributionChartData" :options="contributionChartOptions" class="h-[20rem]" />
+                        <p class="mt-4 text-sm text-muted">This chart compares the contributions of different users in terms of additions and deletions.</p>
                     </div>
                 </div>
             </div>

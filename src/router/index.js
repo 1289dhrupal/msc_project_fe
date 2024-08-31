@@ -9,6 +9,11 @@ const router = createRouter({
             component: AppLayout,
             children: [
                 {
+                    path: '/user',
+                    name: 'user',
+                    component: () => import('@/views/User.vue')
+                },
+                {
                     path: '/',
                     name: 'dashboard',
                     component: () => import('@/views/Dashboard.vue')
@@ -169,7 +174,9 @@ router.beforeEach((to, from, next) => {
     const authRequired = !publicPages.includes(to.path);
     const apiKey = localStorage.getItem('apiKey');
 
-    if (authRequired && !apiKey) {
+    if (!authRequired && apiKey) {
+        next('/'); // Redirect to dashboard if authenticated
+    } else if (authRequired && !apiKey) {
         next('/auth/login'); // Redirect to login page if not authenticated
     } else {
         next(); // Allow access
