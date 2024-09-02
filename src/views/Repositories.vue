@@ -25,6 +25,16 @@ const contributionPieChartOptions = ref();
 const weeklyStatsChartData = ref();
 const weeklyStatsChartOptions = ref();
 
+// New references for the lines of code and file count charts
+const linesOfCodeChartData = ref();
+const linesOfCodeChartOptions = ref();
+const fileCountChartData = ref();
+const fileCountChartOptions = ref();
+
+// Add scoreChartData and scoreChartOptions
+const scoreChartData = ref();
+const scoreChartOptions = ref();
+
 const filters = ref({
     global: { value: null, matchMode: FilterMatchMode.CONTAINS }
 });
@@ -182,10 +192,165 @@ const fetchRepositoryStats = async (id) => {
 const prepareChartData = () => {
     const documentStyle = getComputedStyle(document.documentElement);
 
+    // Define the available colors
+    const availableColors = ['--p-indigo-500', '--p-purple-500', '--p-teal-500', '--p-orange-500', '--p-cyan-500'];
+
+    // Prepare data for lines of code chart
+    const fileTypes = Object.keys(repositoryStats.value.extension_stats);
+
+    const contributors = [...new Set(fileTypes.flatMap((fileType) => Object.keys(repositoryStats.value.extension_stats[fileType])))];
+
+    const linesOfCodeDatasets = contributors.map((contributor, index) => {
+        return {
+            label: contributor,
+            backgroundColor: documentStyle.getPropertyValue(availableColors[index % availableColors.length]),
+            data: fileTypes.map((fileType) => repositoryStats.value.extension_stats[fileType][contributor]?.lines || 0)
+        };
+    });
+
+    linesOfCodeChartData.value = {
+        labels: fileTypes,
+        datasets: linesOfCodeDatasets
+    };
+
+    linesOfCodeChartOptions.value = {
+        maintainAspectRatio: false,
+        aspectRatio: 0.6,
+        plugins: {
+            legend: {
+                labels: {
+                    color: documentStyle.getPropertyValue('--p-text-color')
+                }
+            }
+        },
+        scales: {
+            x: {
+                stacked: true,
+                ticks: {
+                    color: documentStyle.getPropertyValue('--p-text-muted-color')
+                },
+                grid: {
+                    color: documentStyle.getPropertyValue('--p-content-border-color')
+                }
+            },
+            y: {
+                stacked: true,
+                ticks: {
+                    color: documentStyle.getPropertyValue('--p-text-muted-color'),
+                    beginAtZero: true
+                },
+                grid: {
+                    color: documentStyle.getPropertyValue('--p-content-border-color')
+                }
+            }
+        }
+    };
+
+    // Prepare data for file count chart
+    const fileCountDatasets = contributors.map((contributor, index) => {
+        return {
+            label: contributor,
+            backgroundColor: documentStyle.getPropertyValue(availableColors[index % availableColors.length]),
+            data: fileTypes.map((fileType) => repositoryStats.value.extension_stats[fileType][contributor]?.files || 0)
+        };
+    });
+
+    fileCountChartData.value = {
+        labels: fileTypes,
+        datasets: fileCountDatasets
+    };
+
+    fileCountChartOptions.value = {
+        maintainAspectRatio: false,
+        aspectRatio: 0.6,
+        plugins: {
+            legend: {
+                labels: {
+                    color: documentStyle.getPropertyValue('--p-text-color')
+                }
+            }
+        },
+        scales: {
+            x: {
+                stacked: true,
+                ticks: {
+                    color: documentStyle.getPropertyValue('--p-text-muted-color')
+                },
+                grid: {
+                    color: documentStyle.getPropertyValue('--p-content-border-color')
+                }
+            },
+            y: {
+                stacked: true,
+                ticks: {
+                    color: documentStyle.getPropertyValue('--p-text-muted-color'),
+                    beginAtZero: true
+                },
+                grid: {
+                    color: documentStyle.getPropertyValue('--p-content-border-color')
+                }
+            }
+        }
+    };
+
+    // Prepare the rest of the charts (combinedChartData, contributionChartData, etc.)
+
     const labels = repositoryStats.value.churn_rates.map((_, index) => `Commit ${index + 1}`);
     const churnRates = repositoryStats.value.churn_rates.map((stat) => stat.churn_rate);
     const additions = repositoryStats.value.churn_rates.map((stat) => stat.additions);
     const deletions = repositoryStats.value.churn_rates.map((stat) => stat.deletions);
+    const scores = repositoryStats.value.churn_rates.map((stat) => parseInt(stat.score, 10));
+
+    scoreChartData.value = {
+        labels: labels, // Reusing the labels from the commits (Commit 1, Commit 2, etc.)
+        datasets: [
+            {
+                label: 'Score',
+                data: scores,
+                borderColor: documentStyle.getPropertyValue('--p-orange-500'),
+                backgroundColor: 'rgba(255, 152, 0, 0.2)',
+                fill: true,
+                tension: 0.4,
+                yAxisID: 'y'
+            }
+        ]
+    };
+
+    scoreChartOptions.value = {
+        maintainAspectRatio: false,
+        aspectRatio: 0.6,
+        plugins: {
+            legend: {
+                labels: {
+                    color: documentStyle.getPropertyValue('--p-text-color')
+                }
+            }
+        },
+        scales: {
+            x: {
+                ticks: {
+                    color: documentStyle.getPropertyValue('--p-text-muted-color')
+                },
+                grid: {
+                    color: documentStyle.getPropertyValue('--p-content-border-color')
+                }
+            },
+            y: {
+                ticks: {
+                    color: documentStyle.getPropertyValue('--p-text-muted-color'),
+                    beginAtZero: true
+                },
+                grid: {
+                    color: documentStyle.getPropertyValue('--p-content-border-color')
+                },
+                title: {
+                    display: true,
+                    text: 'Score',
+                    color: documentStyle.getPropertyValue('--p-text-color')
+                }
+            }
+        }
+    };
 
     combinedChartData.value = {
         labels: labels,
@@ -246,12 +411,12 @@ const prepareChartData = () => {
     };
 
     // Prepare contribution chart data
-    const contributors = Object.keys(repositoryStats.value.contribution);
-    const additionValues = contributors.map((contributor) => repositoryStats.value.contribution[contributor].additions);
-    const deletionValues = contributors.map((contributor) => repositoryStats.value.contribution[contributor].deletions);
+    const contributorsForChurn = Object.keys(repositoryStats.value.contribution);
+    const additionValues = contributorsForChurn.map((contributor) => repositoryStats.value.contribution[contributor].additions);
+    const deletionValues = contributorsForChurn.map((contributor) => repositoryStats.value.contribution[contributor].deletions);
 
     contributionChartData.value = {
-        labels: contributors,
+        labels: contributorsForChurn,
         datasets: [
             {
                 label: 'Additions',
@@ -312,9 +477,9 @@ const prepareChartData = () => {
     };
 
     // Prepare contribution pie chart data
-    const totalChanges = contributors.map((contributor) => repositoryStats.value.contribution[contributor].total);
+    const totalChanges = contributorsForChurn.map((contributor) => repositoryStats.value.contribution[contributor].total);
     contributionPieChartData.value = {
-        labels: contributors,
+        labels: contributorsForChurn,
         datasets: [
             {
                 label: 'Total Changes',
@@ -415,7 +580,7 @@ const prepareChartData = () => {
     // Prepare Weekly Contribution Stats Chart Data
     const weeklyLabels = Array.from({ length: trimmedStats.length }, (_, i) => `Week ${startIndex + i + 1}`);
 
-    const weeklyDataSets = contributors.map((contributor) => {
+    const weeklyDataSets = contributorsForChurn.map((contributor) => {
         const data = trimmedStats.map((week) => week[contributor] || 0);
         return {
             label: contributor,
@@ -469,12 +634,14 @@ const getContributorColor = (contributor, documentStyle) => {
     const colors = [
         documentStyle.getPropertyValue('--p-green-500'),
         documentStyle.getPropertyValue('--p-blue-500'),
-        documentStyle.getPropertyValue('--p-orange-500')
+        documentStyle.getPropertyValue('--p-orange-500'),
+        documentStyle.getPropertyValue('--p-red-500')
         // Add more colors if there are more contributors
     ];
     const index = contributors.indexOf(contributor) % colors.length;
     return colors[index];
 };
+
 const openStatsDialog = (id) => {
     fetchRepositoryStats(id);
 };
@@ -551,6 +718,7 @@ const totalChanges = computed(() => {
         return acc + curr.additions + Math.abs(curr.deletions);
     }, 0);
 });
+
 onMounted(() => {
     fetchRepositories(route.query.git_token_id);
 });
@@ -748,6 +916,15 @@ watch(route, (newRoute) => {
                         <p class="mt-4 text-sm text-muted">This chart shows the lead time for each commit, providing insights into the development pipeline's efficiency.</p>
                     </div>
 
+                    <!-- New Score Chart -->
+                    <div class="col-span-12 xl:col-span-6">
+                        <div class="card">
+                            <div class="font-semibold text-xl mb-4">Score Over Time</div>
+                            <Chart type="line" :data="scoreChartData" :options="scoreChartOptions" class="h-[20rem]" />
+                            <p class="mt-4 text-sm text-muted">This chart shows the score over time, providing insights into the changes in the score with each commit.</p>
+                        </div>
+                    </div>
+
                     <!-- Weekly Contribution Stats Chart -->
                     <div class="card">
                         <div class="font-semibold text-xl mb-4">Weekly Contribution Stats</div>
@@ -763,11 +940,25 @@ watch(route, (newRoute) => {
                         <p class="mt-4 text-sm text-muted">This pie chart shows the distribution of total code changes (additions and deletions) by each contributor.</p>
                     </div>
 
-                    <!-- Contribution Chart -->
+                    <!-- Contributor Contributions -->
                     <div class="card">
                         <div class="font-semibold text-xl mb-4">Contributor Contributions</div>
                         <Chart type="bar" :data="contributionChartData" :options="contributionChartOptions" class="h-[20rem]" />
                         <p class="mt-4 text-sm text-muted">This chart compares the contributions of different users in terms of additions and deletions.</p>
+                    </div>
+
+                    <!-- Lines of Code Chart -->
+                    <div class="card">
+                        <div class="font-semibold text-xl mb-4">Lines of Code by File Type</div>
+                        <Chart type="bar" :data="linesOfCodeChartData" :options="linesOfCodeChartOptions" class="h-[20rem]" />
+                        <p class="mt-4 text-sm text-muted">This chart shows the total lines of code contributed by each user for each file type.</p>
+                    </div>
+
+                    <!-- File Count Chart -->
+                    <div class="card">
+                        <div class="font-semibold text-xl mb-4">File Count by File Type</div>
+                        <Chart type="bar" :data="fileCountChartData" :options="fileCountChartOptions" class="h-[20rem]" />
+                        <p class="mt-4 text-sm text-muted">This chart shows the total number of files contributed by each user for each file type.</p>
                     </div>
                 </div>
             </div>
