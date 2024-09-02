@@ -102,8 +102,8 @@ function initializeCharts() {
                 backgroundColor: documentStyle.getPropertyValue('--p-primary-500')
             },
             {
-                label: 'Code Changes (in hundreds)',
-                data: Object.values(chartData.value.user_stats).map((user) => (user.code_changes / 100).toFixed(0)),
+                label: 'Code Changes (in thounsands)',
+                data: Object.values(chartData.value.user_stats).map((user) => (user.code_changes / 1000).toFixed(2)),
                 backgroundColor: documentStyle.getPropertyValue('--p-primary-300')
             }
         ]

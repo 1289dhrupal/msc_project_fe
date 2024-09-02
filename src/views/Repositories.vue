@@ -22,6 +22,8 @@ const leadTimeChartData = ref();
 const leadTimeChartOptions = ref();
 const contributionPieChartData = ref();
 const contributionPieChartOptions = ref();
+const weeklyStatsChartData = ref();
+const weeklyStatsChartOptions = ref();
 
 const filters = ref({
     global: { value: null, matchMode: FilterMatchMode.CONTAINS }
@@ -322,7 +324,7 @@ const prepareChartData = () => {
         ]
     };
 
-    const leadTimes = repositoryStats.value.churn_rates.map((stat) => parseInt(stat.lead_time.trim(), 10));
+    const leadTimes = repositoryStats.value.churn_rates.map((stat) => parseInt(stat.lead_time, 10));
 
     // Prepare Lead Time Metrics Chart
     leadTimeChartData.value = {
@@ -404,8 +406,75 @@ const prepareChartData = () => {
             }
         }
     };
+
+    // Prepare Weekly Contribution Stats Chart Data
+
+    // Trim empty arrays from weekly_stats and get the starting index
+    const { trimmedStats, startIndex } = trimWeeklyStats(repositoryStats.value.weekly_stats);
+
+    // Prepare Weekly Contribution Stats Chart Data
+    const weeklyLabels = Array.from({ length: trimmedStats.length }, (_, i) => `Week ${startIndex + i + 1}`);
+
+    const weeklyDataSets = contributors.map((contributor) => {
+        const data = trimmedStats.map((week) => week[contributor] || 0);
+        return {
+            label: contributor,
+            data: data,
+            fill: false,
+            borderColor: getContributorColor(contributor, documentStyle), // function to assign color based on contributor
+            tension: 0.4
+        };
+    });
+
+    weeklyStatsChartData.value = {
+        labels: weeklyLabels,
+        datasets: weeklyDataSets
+    };
+
+    weeklyStatsChartOptions.value = {
+        maintainAspectRatio: false,
+        aspectRatio: 0.6,
+        plugins: {
+            legend: {
+                labels: {
+                    color: documentStyle.getPropertyValue('--p-text-color')
+                }
+            }
+        },
+        scales: {
+            x: {
+                ticks: {
+                    color: documentStyle.getPropertyValue('--p-text-muted-color')
+                },
+                grid: {
+                    color: documentStyle.getPropertyValue('--p-content-border-color')
+                }
+            },
+            y: {
+                ticks: {
+                    color: documentStyle.getPropertyValue('--p-text-muted-color'),
+                    beginAtZero: true
+                },
+                grid: {
+                    color: documentStyle.getPropertyValue('--p-content-border-color')
+                }
+            }
+        }
+    };
 };
 
+const getContributorColor = (contributor, documentStyle) => {
+    const contributors = Object.keys(repositoryStats.value.contribution);
+    // Function to assign a color to each contributor for the chart
+    const colors = [
+        documentStyle.getPropertyValue('--p-green-500'),
+        documentStyle.getPropertyValue('--p-blue-500'),
+        documentStyle.getPropertyValue('--p-orange-500')
+        // Add more colors if there are more contributors
+    ];
+    const index = contributors.indexOf(contributor) % colors.length;
+    return colors[index];
+};
 const openStatsDialog = (id) => {
     fetchRepositoryStats(id);
 };
@@ -449,6 +518,27 @@ const codebaseStability = computed(() => {
 
     return (totalChurnRate / totalCommits).toFixed(2); // Average churn rate
 });
+
+const trimWeeklyStats = (weeklyStats) => {
+    let start = 0;
+    let end = weeklyStats.length;
+
+    // Find the first non-empty array
+    while (start < end && Object.keys(weeklyStats[start]).length === 0) {
+        start++;
+    }
+
+    // Find the last non-empty array
+    while (end > start && Object.keys(weeklyStats[end - 1]).length === 0) {
+        end--;
+    }
+
+    // Return the trimmed array and the corresponding week numbers
+    return {
+        trimmedStats: weeklyStats.slice(start, end),
+        startIndex: start
+    };
+};
 
 const totalCommits = computed(() => {
     return repositoryStats.value.churn_rates ? repositoryStats.value.churn_rates.length : 0;
@@ -656,6 +746,13 @@ watch(route, (newRoute) => {
                         <div class="font-semibold text-xl mb-4">Lead Time Metrics</div>
                         <Chart type="line" :data="leadTimeChartData" :options="leadTimeChartOptions" class="h-[20rem]" />
                         <p class="mt-4 text-sm text-muted">This chart shows the lead time for each commit, providing insights into the development pipeline's efficiency.</p>
+                    </div>
+
+                    <!-- Weekly Contribution Stats Chart -->
+                    <div class="card">
+                        <div class="font-semibold text-xl mb-4">Weekly Contribution Stats</div>
+                        <Chart type="line" :data="weeklyStatsChartData" :options="weeklyStatsChartOptions" class="h-[20rem]" />
+                        <p class="mt-4 text-sm text-muted">This chart shows the weekly contribution stats for each contributor, providing insights into contribution patterns over time.</p>
                     </div>
                 </div>
                 <div class="col-span-12 xl:col-span-6">
