@@ -661,9 +661,9 @@ const exportCSV = () => {
     dt.value.exportCSV();
 };
 
-const isTokenInactive = (repository) => {
+const isTokenActive = (repository) => {
     const token = gitTokens.value.find((token) => token.id === repository.git_token_id);
-    return token ? !token.is_active : true;
+    return token ? token.is_active : false;
 };
 
 const topContributor = computed(() => {
@@ -807,7 +807,7 @@ watch(route, (newRoute) => {
                     <template #body="slotProps">
                         <div class="flex items-center">
                             <Button icon="pi pi-chart-line" class="mr-1" v-tooltip="{ value: 'View Analysis', hideDelay: 100 }" outlined rounded severity="info" @click="openStatsDialog(slotProps.data.id)" />
-                            <Button :disabled="isTokenInactive(slotProps.data)" icon="pi pi-trash" class="mr-1" outlined rounded severity="danger" @click="openConfirmation(slotProps.data.id)" />
+                            <Button :disabled="isTokenActive(slotProps.data)" icon="pi pi-trash" class="mr-1" outlined rounded severity="danger" @click="openConfirmation(slotProps.data.id)" />
                             <ToggleSwitch
                                 v-model="slotProps.data.is_active"
                                 v-tooltip="{ value: slotProps.data.is_active ? 'Deactivate this Token' : 'Activate this Token', hideDelay: 100 }"
