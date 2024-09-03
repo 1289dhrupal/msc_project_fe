@@ -1,0 +1,89 @@
+\---frontend
+    |   .editorconfig
+    |   .env
+    |   .env.sample
+    |   .eslintrc.cjs
+    |   .gitignore
+    |   .prettierrc.json
+    |   CHANGELOG.md
+    |   index.html
+    |   jsconfig.json
+    |   LICENSE.md
+    |   package-lock.json
+    |   package.json
+    |   postcss.config.js
+    |   README.md
+    |   tailwind.config.js
+    |   vercel.json
+    |   vite.config.mjs
+    |   
+    +---.vscode
+    |       extensions.json
+    |       settings.json
+    |       
+    +---node_modules
+    |       *******
+    |       
+    +---public
+    |       favicon.ico
+    |       
+    \---src
+        |   App.vue
+        |   main.js
+        |   
+        +---assets
+        |   |   styles.scss
+        |   |   tailwind.css
+        |   |   
+        |   \---layout
+        |       |   layout.scss
+        |       |   _core.scss
+        |       |   _footer.scss
+        |       |   _main.scss
+        |       |   _menu.scss
+        |       |   _mixins.scss
+        |       |   _preloading.scss
+        |       |   _responsive.scss
+        |       |   _topbar.scss
+        |       |   _typography.scss
+        |       |   _utils.scss
+        |       |   
+        |       \---variables
+        |               _common.scss
+        |               _dark.scss
+        |               _light.scss
+        |               
+        +---components
+        |       FloatingConfigurator.vue
+        |       
+        +---layout
+        |   |   AppConfigurator.vue
+        |   |   AppFooter.vue
+        |   |   AppLayout.vue
+        |   |   AppMenu.vue
+        |   |   AppMenuItem.vue
+        |   |   AppSidebar.vue
+        |   |   AppTopbar.vue
+        |   |   
+        |   \---composables
+        |           layout.js
+        |           
+        +---router
+        |       index.js
+        |       
+        +---service
+        \---views
+            |   Commits.vue
+            |   Dashboard.vue
+            |   Repositories.vue
+            |   Tokens.vue
+            |   User.vue
+            |   
+            \---pages
+                |   NotFound.vue
+                |   
+                \---auth
+                        Access.vue
+                        Error.vue
+                        Login.vue
+                        Register.vue

@@ -51,6 +51,11 @@ const router = createRouter({
             component: () => import('@/views/pages/auth/Register.vue')
         },
         {
+            path: '/auth/reset-password',
+            name: 'reset-password',
+            component: () => import('@/views/pages/auth/ResetPassword.vue')
+        },
+        {
             path: '/:pathMatch(.*)*',
             name: 'notfound',
             component: () => import('@/views/pages/NotFound.vue')
@@ -60,7 +65,7 @@ const router = createRouter({
 
 // Global navigation guard to protect routes
 router.beforeEach((to, from, next) => {
-    const publicPages = ['/auth/login', '/auth/register', '/auth/error'];
+    const publicPages = ['/auth/login', '/auth/register', '/auth/error', '/auth/reset-password'];
     const authRequired = !publicPages.includes(to.path);
     const apiKey = localStorage.getItem('apiKey') || sessionStorage.getItem('apiKey');
 

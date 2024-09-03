@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 
 const email = ref('');
 const password = ref('');
-const rememberMe = ref(false); // State for the "Remember Me" checkbox
+const rememberMe = ref(false);
 
 // State for handling the visibility and message of the tags
 const infoMessage = ref('Sign in to continue');
@@ -13,6 +13,9 @@ const errorMessage = ref('');
 
 const route = useRoute();
 const router = useRouter();
+
+const resetPasswordDialogVisible = ref(false);
+const resetEmail = ref('');
 
 onMounted(() => {
     // Check if route.query exists and has successMessage
@@ -89,6 +92,47 @@ const submitLogin = async () => {
         infoMessage.value = ''; // Clear the info message
     }
 };
+
+// Function to handle the password reset request
+const submitResetPassword = async () => {
+    if (!resetEmail.value) {
+        errorMessage.value = 'Email is required.';
+        successMessage.value = '';
+        infoMessage.value = '';
+        return;
+    }
+
+    try {
+        const response = await fetch(`${apiUrl}/reset-password?email=${resetEmail.value}`, {
+            method: 'GET'
+        });
+
+        if (!response.ok) {
+            const data = await response.json();
+            errorMessage.value = data.message; // Set the error message
+            successMessage.value = ''; // Clear the success message
+            infoMessage.value = ''; // Clear the info message
+            throw new Error(data.message);
+        }
+
+        await response.json();
+        successMessage.value = 'A password reset link has been sent to your email.';
+        errorMessage.value = ''; // Set the error message
+        infoMessage.value = ''; // Clear the info message
+        resetPasswordDialogVisible.value = false; // Close the dialog after successful submission
+    } catch (error) {
+        console.error('Error during password reset:', error);
+        errorMessage.value = error.message; // Display error message
+        successMessage.value = ''; // Clear the success message
+        infoMessage.value = ''; // Clear the info message
+    }
+};
+
+// Function to open the reset password dialog
+const openResetPasswordDialog = () => {
+    resetEmail.value = ''; // Clear the input field
+    resetPasswordDialogVisible.value = true;
+};
 </script>
 
 <template>
@@ -129,7 +173,7 @@ const submitLogin = async () => {
                             <div class="flex items-center">
                                 <router-link to="/auth/register" class="font-medium no-underline ml-2 text-right cursor-pointer text-primary">Register</router-link>
                             </div>
-                            <span class="font-medium no-underline ml-2 text-right cursor-pointer text-primary">Forgot password?</span>
+                            <span class="font-medium no-underline ml-2 text-right cursor-pointer text-primary" @click="openResetPasswordDialog">Forgot password?</span>
                         </div>
 
                         <!-- Button to submit the form -->
@@ -139,6 +183,15 @@ const submitLogin = async () => {
             </div>
         </div>
     </div>
+
+    <!-- Password Reset Dialog -->
+    <Dialog v-model:visible="resetPasswordDialogVisible" header="Reset Password" :modal="true" :closable="true">
+        <div>
+            <p class="mb-4">Enter your email address to receive a password reset link:</p>
+            <InputText v-model="resetEmail" placeholder="Email address" class="w-full mb-4" />
+            <Button label="Submit" class="w-full" @click="submitResetPassword" />
+        </div>
+    </Dialog>
 </template>
 
 <style scoped>
