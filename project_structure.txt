@@ -87,3 +87,4 @@
                         Error.vue
                         Login.vue
                         Register.vue
+                        ResetPassword.vue
