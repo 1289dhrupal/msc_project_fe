@@ -53,7 +53,7 @@ const fetchRepositories = async (tokenId = null) => {
         const response = await fetch(fetchUrl, {
             method: 'GET',
             headers: {
-                Authorization: localStorage.getItem('apiKey'),
+                Authorization: localStorage.getItem('apiKey') || sessionStorage.getItem('apiKey'),
                 'Content-Type': 'application/json'
             }
         });
@@ -98,7 +98,7 @@ const deleteRepository = async (id) => {
         const response = await fetch(`${apiUrl}/git/repositories/${id}`, {
             method: 'DELETE',
             headers: {
-                Authorization: localStorage.getItem('apiKey'),
+                Authorization: localStorage.getItem('apiKey') || sessionStorage.getItem('apiKey'),
                 'Content-Type': 'application/json'
             }
         });
@@ -127,7 +127,7 @@ const toggleRepositoryStatus = async (id, newStatus) => {
         const response = await fetch(`${apiUrl}/git/repositories/${id}/toggle`, {
             method: 'POST',
             headers: {
-                Authorization: localStorage.getItem('apiKey'),
+                Authorization: localStorage.getItem('apiKey') || sessionStorage.getItem('apiKey'),
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
@@ -171,7 +171,7 @@ const fetchRepositoryStats = async (id) => {
         const response = await fetch(`${apiUrl}/git/repositories/${id}/stats`, {
             method: 'GET',
             headers: {
-                Authorization: localStorage.getItem('apiKey'),
+                Authorization: localStorage.getItem('apiKey') || sessionStorage.getItem('apiKey'),
                 'Content-Type': 'application/json'
             }
         });
@@ -810,7 +810,7 @@ watch(route, (newRoute) => {
                             <Button :disabled="isTokenInactive(slotProps.data)" icon="pi pi-trash" class="mr-1" outlined rounded severity="danger" @click="openConfirmation(slotProps.data.id)" />
                             <ToggleSwitch
                                 v-model="slotProps.data.is_active"
-                                v-tooltip="{ value: slotProps.data.is_active ? 'Deactivate this Token' : 'Activate this Token', hideDelay: 1000 }"
+                                v-tooltip="{ value: slotProps.data.is_active ? 'Deactivate this Token' : 'Activate this Token', hideDelay: 100 }"
                                 class="ml-1"
                                 @change="handleToggleChange(slotProps.data.id, slotProps.data.is_active)"
                             />

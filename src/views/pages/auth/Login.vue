@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 
 const email = ref('');
 const password = ref('');
+const rememberMe = ref(false); // State for the "Remember Me" checkbox
 
 // State for handling the visibility and message of the tags
 const infoMessage = ref('Sign in to continue');
@@ -21,6 +22,7 @@ onMounted(() => {
         infoMessage.value = ''; // Clear the default info message if there's a success message
     }
 });
+
 // Get the API base URL and allowed email domains from environment variables
 const apiUrl = import.meta.env.VITE_API_URL;
 const allowedDomains = import.meta.env.VITE_ALLOWED_EMAIL_DOMAINS;
@@ -67,8 +69,12 @@ const submitLogin = async () => {
         const data = await response.json();
         const apiKey = data.data.apiKey;
 
-        // Store the API key in localStorage
-        localStorage.setItem('apiKey', apiKey);
+        // Store the API key in the appropriate storage
+        if (rememberMe.value) {
+            localStorage.setItem('apiKey', apiKey);
+        } else {
+            sessionStorage.setItem('apiKey', apiKey);
+        }
 
         successMessage.value = data.message; // Set the success message
         errorMessage.value = ''; // Clear the error message
@@ -95,7 +101,7 @@ const submitLogin = async () => {
                         <svg viewBox="0 0 54 40" fill="none" xmlns="http://www.w3.org/2000/svg" class="mb-8 w-16 shrink-0 mx-auto">
                             <!-- SVG content here -->
                         </svg>
-                        <div class="text-surface-900 dark:text-surface-0 text-3xl font-medium mb-4">Welcome to PrimeLand!</div>
+                        <div class="text-surface-900 dark:text-surface-0 text-3xl font-medium mb-4">Welcome!</div>
 
                         <!-- Info tag displayed by default -->
                         <Tag v-if="infoMessage" severity="info" :value="infoMessage" :rounded="true" class="mb-4"></Tag>
@@ -111,6 +117,12 @@ const submitLogin = async () => {
 
                         <label for="password1" class="block text-surface-900 dark:text-surface-0 font-medium text-xl mb-2">Password</label>
                         <Password id="password1" v-model="password" placeholder="Password" :toggleMask="true" class="mb-4" fluid :feedback="false" />
+
+                        <!-- "Remember Me" checkbox -->
+                        <div class="flex items-center mb-8">
+                            <Checkbox id="rememberMe" name="rememberMe" :value="true" v-model="rememberMe" />
+                            <label for="rememberMe" class="ml-2 text-surface-900 dark:text-surface-0">Remember Me</label>
+                        </div>
 
                         <!-- TODO: forgot password is not functional -->
                         <div class="flex items-center justify-between mt-2 mb-8 gap-8">

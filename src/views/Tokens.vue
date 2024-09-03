@@ -32,7 +32,7 @@ const fetchTokens = async () => {
         const response = await fetch(`${apiUrl}/git-token/list`, {
             method: 'GET',
             headers: {
-                Authorization: localStorage.getItem('apiKey'),
+                Authorization: localStorage.getItem('apiKey') || sessionStorage.getItem('apiKey'),
                 'Content-Type': 'application/json'
             }
         });
@@ -61,7 +61,7 @@ const addToken = async () => {
         const response = await fetch(`${apiUrl}/git-token/store`, {
             method: 'POST',
             headers: {
-                Authorization: localStorage.getItem('apiKey'),
+                Authorization: localStorage.getItem('apiKey') || sessionStorage.getItem('apiKey'),
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
@@ -103,7 +103,7 @@ const updateToken = async () => {
         const response = await fetch(`${apiUrl}/git-token/${selectedTokenId.value}/edit`, {
             method: 'POST',
             headers: {
-                Authorization: localStorage.getItem('apiKey'),
+                Authorization: localStorage.getItem('apiKey') || sessionStorage.getItem('apiKey'),
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
@@ -135,7 +135,7 @@ const deleteToken = async (id) => {
         const response = await fetch(`${apiUrl}/git-token/${id}`, {
             method: 'DELETE',
             headers: {
-                Authorization: localStorage.getItem('apiKey'),
+                Authorization: localStorage.getItem('apiKey') || sessionStorage.getItem('apiKey'),
                 'Content-Type': 'application/json'
             }
         });
@@ -164,7 +164,7 @@ const toggleTokenStatus = async (id, newStatus) => {
         const response = await fetch(`${apiUrl}/git-token/${id}/toggle`, {
             method: 'POST',
             headers: {
-                Authorization: localStorage.getItem('apiKey'),
+                Authorization: localStorage.getItem('apiKey') || sessionStorage.getItem('apiKey'),
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
@@ -331,11 +331,11 @@ watch(newService, (service) => {
                     <template #body="slotProps">
                         <div class="flex items-center">
                             <Button icon="pi pi-pencil" class="ml-1" v-tooltip="{ value: 'Edit Token', hideDelay: 100 }" outlined rounded severity="warning" @click="openEditTokenDialog(slotProps.data.id)" />
-                            <Button icon="pi pi-chart-line" class="mr-1" v-tooltip="{ value: 'View Analysis', hideDelay: 100 }" outlined rounded severity="info" @click="openConfirmation(slotProps.data.id)" />
+                            <!-- <Button icon="pi pi-chart-line" class="mr-1" v-tooltip="{ value: 'View Analysis', hideDelay: 100 }" outlined rounded severity="info" @click="openConfirmation(slotProps.data.id)" /> -->
                             <Button icon="pi pi-trash" class="mr-1" outlined rounded severity="danger" @click="openConfirmation(slotProps.data.id)" />
                             <ToggleSwitch
                                 v-model="slotProps.data.is_active"
-                                v-tooltip="{ value: slotProps.data.is_active ? 'Deactivate this Token' : 'Activate this Token', hideDelay: 1000 }"
+                                v-tooltip="{ value: slotProps.data.is_active ? 'Deactivate this Token' : 'Activate this Token', hideDelay: 100 }"
                                 class="ml-1"
                                 @change="handleToggleChange(slotProps.data.id, slotProps.data.is_active)"
                             />

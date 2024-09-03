@@ -26,7 +26,7 @@ const fetchUserProfile = async () => {
         const response = await fetch(`${apiUrl}/user`, {
             method: 'GET',
             headers: {
-                Authorization: localStorage.getItem('apiKey'),
+                Authorization: localStorage.getItem('apiKey') || sessionStorage.getItem('apiKey'),
                 'Content-Type': 'application/json'
             }
         });
@@ -69,7 +69,7 @@ const updateUserProfile = async () => {
         const response = await fetch(`${apiUrl}/user`, {
             method: 'POST',
             headers: {
-                Authorization: localStorage.getItem('apiKey'),
+                Authorization: localStorage.getItem('apiKey') || sessionStorage.getItem('apiKey'),
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(requestData)
@@ -104,7 +104,7 @@ watch(
             const response = await fetch(`${apiUrl}/user/alerts`, {
                 method: 'POST',
                 headers: {
-                    Authorization: localStorage.getItem('apiKey'),
+                    Authorization: localStorage.getItem('apiKey') || sessionStorage.getItem('apiKey'),
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(requestData)

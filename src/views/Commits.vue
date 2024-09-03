@@ -37,7 +37,7 @@ const fetchCommits = async (repositoryId = null) => {
         const response = await fetch(endpointUrl, {
             method: 'GET',
             headers: {
-                Authorization: localStorage.getItem('apiKey'),
+                Authorization: localStorage.getItem('apiKey') || sessionStorage.getItem('apiKey'),
                 'Content-Type': 'application/json'
             }
         });
@@ -61,7 +61,7 @@ const fetchCommitStats = async (id) => {
         const response = await fetch(`${apiUrl}/git/commits/${id}/stats`, {
             method: 'GET',
             headers: {
-                Authorization: localStorage.getItem('apiKey'),
+                Authorization: localStorage.getItem('apiKey') || sessionStorage.getItem('apiKey'),
                 'Content-Type': 'application/json'
             }
         });

@@ -113,8 +113,11 @@ const model = ref([
 ]);
 
 function logout() {
-    localStorage.removeItem('apiKey'); // Remove the API key from localStorage
-    router.push('/auth/login'); // Redirect to the login page
+    // Remove the API key from both localStorage and sessionStorage
+    localStorage.removeItem('apiKey');
+    sessionStorage.removeItem('apiKey');
+    // Redirect to the login page
+    router.push('/auth/login');
 }
 </script>
 

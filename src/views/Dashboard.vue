@@ -28,7 +28,7 @@ async function fetchDataAndInitializeCharts() {
         const response = await fetch(`${apiUrl}/dashboard/overallStats`, {
             method: 'GET',
             headers: {
-                Authorization: localStorage.getItem('apiKey'),
+                Authorization: localStorage.getItem('apiKey') || sessionStorage.getItem('apiKey'),
                 'Content-Type': 'application/json'
             }
         });

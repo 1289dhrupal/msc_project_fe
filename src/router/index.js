@@ -172,7 +172,7 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
     const publicPages = ['/auth/login', '/auth/register', '/auth/access', '/auth/error', '/landing'];
     const authRequired = !publicPages.includes(to.path);
-    const apiKey = localStorage.getItem('apiKey');
+    const apiKey = localStorage.getItem('apiKey') || sessionStorage.getItem('apiKey');
 
     if (!authRequired && apiKey) {
         next('/'); // Redirect to dashboard if authenticated
