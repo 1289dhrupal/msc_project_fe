@@ -1,4 +1,5 @@
 <script setup>
+import { useLayout } from '@/layout/composables/layout';
 import { FilterMatchMode } from '@primevue/core/api';
 import { useToast } from 'primevue/usetoast';
 import { computed, onMounted, ref, watch } from 'vue';
@@ -7,7 +8,12 @@ import { useRoute, useRouter } from 'vue-router';
 const commits = ref([]);
 const repositories = ref([]);
 const searchQuery = ref('');
+
+const { getPrimary, getSurface, isDarkTheme } = useLayout();
 const apiUrl = import.meta.env.VITE_API_URL;
+const fileTypeChartData = ref({});
+const fileChangesChartData = ref({});
+const pieOptions = ref({});
 
 const commitStatsDialog = ref(false);
 const commitStats = ref(null); // Initialize as null
@@ -65,6 +71,7 @@ const fetchCommitStats = async (id) => {
         const data = await response.json();
         if (data.success) {
             commitStats.value = data.data;
+            prepareChartData();
             commitStatsDialog.value = true;
         } else {
             toast.add({ severity: 'error', summary: 'Error', detail: data.message || 'Failed to fetch commit stats.', life: 3000 });
@@ -72,6 +79,66 @@ const fetchCommitStats = async (id) => {
     } catch (error) {
         toast.add({ severity: 'error', summary: 'Error', detail: error.message, life: 3000 });
     }
+};
+
+const prepareChartData = () => {
+    // Prepare data for the pie charts
+    const extensionCounts = {};
+    const extensionChanges = {};
+
+    commitStats.value.files.forEach((file) => {
+        const ext = file.extension || 'Unknown';
+        if (!extensionCounts[ext]) {
+            extensionCounts[ext] = 0;
+            extensionChanges[ext] = 0;
+        }
+        extensionCounts[ext]++;
+        extensionChanges[ext] += file.total;
+    });
+
+    const documentStyle = getComputedStyle(document.documentElement);
+    const chartColors = [
+        documentStyle.getPropertyValue('--p-primary-500'),
+        documentStyle.getPropertyValue('--p-teal-500'),
+        documentStyle.getPropertyValue('--p-purple-500'),
+        documentStyle.getPropertyValue('--p-orange-500'),
+        documentStyle.getPropertyValue('--p-indigo-500'),
+        documentStyle.getPropertyValue('--p-cyan-500')
+    ];
+
+    fileTypeChartData.value = {
+        labels: Object.keys(extensionCounts),
+        datasets: [
+            {
+                data: Object.values(extensionCounts),
+                backgroundColor: chartColors,
+                hoverBackgroundColor: chartColors
+            }
+        ]
+    };
+
+    fileChangesChartData.value = {
+        labels: Object.keys(extensionChanges),
+        datasets: [
+            {
+                data: Object.values(extensionChanges),
+                backgroundColor: chartColors,
+                hoverBackgroundColor: chartColors
+            }
+        ]
+    };
+
+    pieOptions.value = {
+        plugins: {
+            legend: {
+                labels: {
+                    color: documentStyle.getPropertyValue('--text-color')
+                }
+            }
+        },
+        maintainAspectRatio: false,
+        aspectRatio: 1.2
+    };
 };
 
 const openStatsDialog = (id) => {
@@ -109,6 +176,10 @@ watch(route, (newRoute) => {
     if (!newRoute.query.git_token_id) {
         fetchCommits();
     }
+});
+
+watch([getPrimary, getSurface, isDarkTheme], () => {
+    prepareChartData(); // Pass the documentStyle to reinitialize the charts
 });
 
 const goBack = () => {
@@ -340,16 +411,56 @@ onMounted(() => {
                     </div>
                 </div>
             </div>
+
+            <!-- Pie Chart for Number of File Types per Extension -->
+            <div class="col-span-12 lg:col-span-6 xl:col-span-6">
+                <div class="card">
+                    <h3 class="font-semibold text-xl mb-4">File Types by Extension</h3>
+                    <Chart type="pie" :data="fileTypeChartData" :options="pieOptions" class="h-[20rem]" />
+                </div>
+            </div>
+
+            <!-- Pie Chart for Total Changes per Extension -->
+            <div class="col-span-12 lg:col-span-6 xl:col-span-6">
+                <div class="card">
+                    <h3 class="font-semibold text-xl mb-4">Total Changes by Extension</h3>
+                    <Chart type="pie" :data="fileChangesChartData" :options="pieOptions" class="h-[20rem]" />
+                </div>
+            </div>
         </div>
 
         <h3 v-if="commitStats.files.length" class="mt-4 mb-2">Files in this Commit:</h3>
-        <DataTable v-if="commitStats.files.length" :value="commitStats.files" :paginator="false">
-            <Column field="filename" header="Filename" style="min-width: 200px"></Column>
-            <Column field="extension" header="Extension" style="min-width: 150px"></Column>
-            <Column field="status" header="Status" style="min-width: 150px"></Column>
-            <Column field="additions" header="Additions" style="min-width: 150px"></Column>
-            <Column field="deletions" header="Deletions" style="min-width: 150px"></Column>
-            <Column field="total" header="Total Changes" style="min-width: 150px"></Column>
+        <DataTable v-if="commitStats.files.length" :value="commitStats.files" scrollable paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown" :rows="10" :paginator="true">
+            <template #header>
+                <div class="flex flex-wrap gap-2 items-center justify-between">
+                    <div class="font-semibold text-xl mb-4">Files List ({{ commitStats.files.length !== 0 ? commitStats.files.length : 'No files found' }})</div>
+                </div>
+            </template>
+
+            <Column field="filename" header="Filename" sortable style="min-width: 200px"></Column>
+            <Column field="extension" header="Extension" sortable style="min-width: 150px"></Column>
+            <Column field="status" header="Status" sortable style="min-width: 150px"></Column>
+            <Column field="additions" header="Additions" sortable style="min-width: 150px">
+                <template #body="slotProps">
+                    <Tag icon="pi pi-check" severity="success" :value="slotProps.data.additions" class="w-full">
+                        <span class="flex-grow text-center">{{ slotProps.data.additions }}</span>
+                    </Tag>
+                </template>
+            </Column>
+            <Column field="deletions" header="Deletions" sortable style="min-width: 150px">
+                <template #body="slotProps">
+                    <Tag icon="pi pi-times" severity="danger" :value="slotProps.data.deletions" class="w-full">
+                        <span class="flex-grow text-center">{{ slotProps.data.deletions }}</span>
+                    </Tag>
+                </template>
+            </Column>
+            <Column field="total" header="Total Changes" sortable style="min-width: 150px">
+                <template #body="slotProps">
+                    <Tag icon="pi pi-info-circle" severity="info" :value="slotProps.data.total" class="w-full">
+                        <span class="flex-grow text-center">{{ slotProps.data.total }}</span>
+                    </Tag>
+                </template>
+            </Column>
         </DataTable>
     </Dialog>
 </template>

@@ -244,6 +244,7 @@ const customExportFunction = (cell) => {
             return cell.data;
     }
 };
+
 const exportCSV = () => {
     dt.value.exportCSV();
 };

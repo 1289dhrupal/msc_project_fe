@@ -1,4 +1,5 @@
 <script setup>
+import { useLayout } from '@/layout/composables/layout';
 import { FilterMatchMode } from '@primevue/core/api';
 import { useToast } from 'primevue/usetoast';
 import { computed, onMounted, ref, watch } from 'vue';
@@ -8,6 +9,7 @@ const repositories = ref([]);
 const gitTokens = ref([]);
 const selectedTokenId = ref([]);
 const searchQuery = ref('');
+const { getPrimary, getSurface, isDarkTheme } = useLayout();
 const apiUrl = import.meta.env.VITE_API_URL;
 
 const displayConfirmation = ref(false);
@@ -721,6 +723,10 @@ const totalChanges = computed(() => {
 
 onMounted(() => {
     fetchRepositories(route.query.git_token_id);
+});
+
+watch([getPrimary, getSurface, isDarkTheme], () => {
+    prepareChartData(); // Pass the documentStyle to reinitialize the charts
 });
 
 watch(route, (newRoute) => {
