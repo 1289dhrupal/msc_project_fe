@@ -777,7 +777,7 @@ watch(route, (newRoute) => {
                 </template>
 
                 <Column field="id" header="ID" sortable frozen style="min-width: 150px"></Column>
-                <Column field="url" header="Repository" sortable style="min-width: 200px">
+                <Column field="url" header="Repository" sortable style="min-width: 300px">
                     <template #body="slotProps">
                         <div class="flex items-center">
                             <a :href="slotProps.data.url" target="_blank" class="text-blue-500 underline">
