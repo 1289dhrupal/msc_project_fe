@@ -1,4 +1,4 @@
-\---frontend
+\--- frontend
     |   .editorconfig
     |   .env
     |   .env.sample
@@ -12,6 +12,7 @@
     |   package-lock.json
     |   package.json
     |   postcss.config.js
+    |   project_structure.txt
     |   README.md
     |   tailwind.config.js
     |   vercel.json
@@ -22,7 +23,8 @@
     |       settings.json
     |       
     +---node_modules
-    |       *******
+    |   |
+    |   \ *   
     |       
     +---public
     |       favicon.ico
