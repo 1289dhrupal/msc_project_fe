@@ -201,9 +201,6 @@ onMounted(() => {
 
         <div class="card">
             <Toolbar class="mb-6">
-                <template #start v-if="!route.query.git_token_id">
-                    <Select v-model="selectedTokenId" :options="gitTokens" optionLabel="token" placeholder="Select a Token to filter repositories" class="w-full" @change="onTokenSelect" />
-                </template>
                 <template #end>
                     <Button label="Export" icon="pi pi-upload" severity="secondary" @click="exportCSV" />
                 </template>
